@@ -1,6 +1,7 @@
 rules_version = '2';
-// フェーズ4：users / seeds（読む・蒔く・配達）/ worlds/{uid}/tiles（自分の種・届いた種の配置）。
-// 手紙はフェーズ5で追加し、フェーズ6で Emulator テストとあわせて仕上げる。
+// フェーズ5：users / seeds（読む・蒔く・配達）/ worlds/{uid}/tiles（自分の種・届いた種の配置）
+//            / seeds/{id}/letters/{書いた人の uid}（手紙とありがとう）。
+// フェーズ6で Emulator テストとあわせて仕上げる。
 service cloud.firestore {
   match /databases/{db}/documents {
     function signedIn() { return request.auth != null; }
@@ -63,6 +64,36 @@ service cloud.firestore {
         && existsAfter(/databases/$(db)/documents/worlds/$(me())/tiles/$(seedId));
 
       allow delete: if false;
+
+      // 手紙：ドキュメント ID＝書いた人の uid（1 つの種に 1 人 1 回）
+      match /letters/{writer} {
+        function seed() { return get(/databases/$(db)/documents/seeds/$(seedId)).data; }
+
+        // 読めるのは、蒔いた人と、その手紙を書いた人だけ
+        allow read: if signedIn() && (me() == writer || seed().ownerUid == me());
+
+        // 書けるのは、自分の世界にある種だけ（自分の種と、届いた公開中の種）
+        allow create: if signedIn() && me() == writer
+          && (seed().ownerUid == me()
+              || (seed().status == 'public'
+                  && exists(/databases/$(db)/documents/worlds/$(me())/tiles/$(seedId))))
+          && request.resource.data.keys().hasOnly(['writerUid','text','createdAt','thanked','thankedAt'])
+          && request.resource.data.writerUid == me()
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 300
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.thanked == false
+          && request.resource.data.thankedAt == null;
+
+        // ありがとう：蒔いた人だけが、false → true にできる（取り消せない）
+        allow update: if signedIn() && seed().ownerUid == me()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['thanked','thankedAt'])
+          && resource.data.thanked == false
+          && request.resource.data.thanked == true
+          && request.resource.data.thankedAt == request.time;
+
+        allow delete: if false;
+      }
     }
   }
 }

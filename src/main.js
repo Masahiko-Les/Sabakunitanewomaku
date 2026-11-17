@@ -1,5 +1,6 @@
 import './style.css';
-import { enabled as FB, initUser, saveUser, loadMyWorld, plantSeed, findDeliverable, receiveSeed } from './firebase.js';
+import { enabled as FB, initUser, saveUser, loadMyWorld, plantSeed, findDeliverable, receiveSeed,
+  getUid, watchLetters, watchMyLetter, writeLetter, thankLetter } from './firebase.js';
 
 // 見本の種 8 つを置くか（未決事項。決まるまでは試作版と同じく置く）
 const USE_SAMPLES = import.meta.env.VITE_USE_SAMPLES !== 'false';
@@ -66,6 +67,7 @@ const decor=new Uint8Array(N*N), decoList=[];
 const KEY='sabaku-ni-tane-v3';
 let S={seeds:[],init:false,introSeen:false};
 let ready=false; // users/{uid} を読み終えるまで操作を受け付けない
+const SEEN={}; // 種ごとに、最後に見たできごとの時刻（users/{uid}.seen）
 const FLOWERS=[{p:'#f29bb0',c:'#f7d36b',n:5,g:'255,150,180'},{p:'#f7c948',c:'#c97b2b',n:8,g:'255,210,90'},{p:'#ffffff',c:'#f2c14e',n:6,g:'255,250,235'},{p:'#b79be8',c:'#f5e08a',n:5,g:'190,160,255'},{p:'#f59a7a',c:'#fff1c1',n:6,g:'255,170,130'}];
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
@@ -339,7 +341,8 @@ $('#btnPlant').onclick=()=>{if(!ready)return;const pi=plantState();if(!pi.ok)ret
   ok.onclick=()=>{if(seedOn(pi.tx,pi.ty)){closeSheet();return}
    const crisis=CRISIS.test(h.value+f.value);
    const sd={x:pi.tx,y:pi.ty,h:h.value.trim(),f:f.value.trim(),flower:Math.floor(Math.random()*5),hidden:crisis};
-   S.seeds.push({id:plantSeed(sd).id||uid(),...sd,mine:true,t:Date.now(),letters:[],plantedAt:performance.now()});save();
+   const pr=plantSeed(sd),ns={id:pr.id||uid(),...sd,mine:true,t:Date.now(),letters:[],plantedAt:performance.now()};S.seeds.push(ns);save();
+   if(pr.id)pr.done.then(()=>watchOwn(ns));
    const sx=(pi.tx+.5)*TILE;for(const dx of[-TILE*.75,TILE*.75]){if(!solid(sx+dx,P.y+10)){P.x=sx+dx;break}}
    if(crisis){openSheet(`<div class="kicker">種を預かりました</div>${careHTML()}<p class="note">この種は、ほかの人には見えない場所にそっと置いておきます。（公開版では、管理者が確認してから扱いを決める想定です）</p><div class="row"><button class="btn main small" id="x">閉じる</button></div>`,e=>e.querySelector('#x').onclick=closeSheet)}
    else{closeSheet();toast('種を蒔きました')}}})};
@@ -355,11 +358,12 @@ function openSeed(s){if(s.mine)return openMine(s);if(s.granny)return openGrannyS
   <div class="row"><button class="btn ghost small" id="x">閉じる</button><button class="btn main small" id="ok" disabled>水をあげる</button></div>`}
  else{body+=`<div class="letter"><div class="from">あなたが届けた手紙</div><div class="txt">${esc(mine.text)}</div></div>
   <p class="state">${mine.thanked?'ありがとうが返ってきて、花がひとつ咲きました。':'手紙は届いています。'}</p><div class="row"><button class="btn soft small" id="x">閉じる</button></div>`}
- if(s.unread){s.unread=false;save()}
+ markSeen(s);
  openSheet(body,el=>{el.querySelector('#x').onclick=closeSheet;const ta=el.querySelector('#tL');if(!ta)return;
   const ok=el.querySelector('#ok');lineLimit(ta,10,el.querySelector('#cL'));ta.addEventListener('input',()=>ok.disabled=!ta.value.trim());
-  ok.onclick=()=>{const l={id:uid(),from:'me',text:ta.value.trim(),t:Date.now(),thanked:false};s.letters.push(l);save();
-   if(s.sample)saveUser({['sampleLetters.'+s.id]:{text:l.text,t:l.t,thanked:false}});closeSheet();toast('水をあげました')}})}
+  ok.onclick=()=>{const l={id:getUid()||uid(),from:'me',text:ta.value.trim(),t:Date.now(),thanked:false};s.letters.push(l);save();
+   if(s.sample)saveUser({['sampleLetters.'+s.id]:{text:l.text,t:l.t,thanked:false}});
+   else if(FB){writeLetter(s.id,l.text);watchReceived(s)}closeSheet();toast('水をあげました')}})}
 
 function openMine(s){
  const self=s.letters.find(l=>l.from==='me');
@@ -370,14 +374,14 @@ function openMine(s){
  ${s.letters.length?`<div class="sec">届いた手紙</div>${letters}`:`<p class="empty">まだ手紙は届いていません。誰かが通りかかるのを、静かに待っています。</p>`}
  ${self?'':`<div id="selfWrap"><div class="row" style="justify-content:flex-start"><button class="btn ghost small" id="selfBtn" style="padding-left:0">自分に、手紙を書く</button></div></div>`}
  <div class="row"><button class="btn soft small" id="x">閉じる</button></div>`;
- if(s.unread){s.unread=false;save()}
+ markSeen(s);
  openSheet(body,el=>{el.querySelector('#x').onclick=closeSheet;
-  el.querySelectorAll('[data-thx]').forEach(b=>b.onclick=()=>{const l=s.letters.find(z=>z.id===b.dataset.thx);if(!l)return;l.thanked=true;l.thankedAt=Date.now();save();
+  el.querySelectorAll('[data-thx]').forEach(b=>b.onclick=()=>{const l=s.letters.find(z=>z.id===b.dataset.thx);if(!l)return;l.thanked=true;l.thankedAt=Date.now();save();thankLetter(s.id,l.id);
    b.parentElement.textContent='ありがとうを返しました';if(!s.hidden){bloom(s);setTimeout(closeSheet,500)}});
   const sb=el.querySelector('#selfBtn');if(sb)sb.onclick=()=>{const w=el.querySelector('#selfWrap');
    w.innerHTML=`<label>自分に、優しい言葉をかける（10行まで）</label><textarea id="tS" rows="5" maxlength="300" placeholder="友だちにかけるような言葉で"></textarea><div class="count" id="cS"></div><div class="row"><button class="btn main small" id="sOk" disabled>水をあげる</button></div>`;
    const ta=w.querySelector('#tS'),ok=w.querySelector('#sOk');lineLimit(ta,10,w.querySelector('#cS'));ta.addEventListener('input',()=>ok.disabled=!ta.value.trim());ta.focus();
-   ok.onclick=()=>{s.letters.push({id:uid(),from:'me',text:ta.value.trim(),t:Date.now(),thanked:false});save();openMine(s)}}})}
+   ok.onclick=()=>{const text=ta.value.trim();s.letters.push({id:getUid()||uid(),from:'me',text,t:Date.now(),thanked:false});save();writeLetter(s.id,text);openMine(s)}}})}
 
 /* ---------- my seeds list ---------- */
 function goTo(s){const cx=(s.x+.5)*TILE,cy=(s.y+.5)*TILE;P.x=cx-TILE;P.y=cy-10;if(solid(P.x,P.y+10))P.x=cx+TILE;
@@ -508,18 +512,18 @@ requestAnimationFrame(frame);refreshDot();
 /* ---------- user (Firestore) ---------- */
 // 講習の進み具合・説明を見たか・おばあちゃんへの手紙は users/{uid} を正とする
 function applyUser(u){if(!u)return;S.tutorial=u.tutorial||0;S.metGranny=!!u.metGranny;S.introSeen=!!u.introSeen;
- U.receivedToday=u.receivedToday||0;U.receivedDate=u.receivedDate||'';
+ U.receivedToday=u.receivedToday||0;U.receivedDate=u.receivedDate||'';Object.assign(SEEN,u.seen||{});
  for(const s of S.seeds){if(!s.sample)continue;const l=(u.sampleLetters||{})[s.id];
   if(l)s.letters=[{id:'sample-letter',from:'me',text:l.text,t:l.t,thanked:!!l.thanked}];else s.letters=[]}
  const g=grannySeed();if(g)g.letters=u.grannyLetter?[{id:'granny-letter',from:'me',text:u.grannyLetter,t:Date.now(),thanked:S.tutorial>=2}]:[];
  save();rebuildWorld()}
 // 自分の世界の種は worlds/{uid}/tiles と seeds を正とする。
-// 手紙・ありがとう・未読はフェーズ5で Firestore に移すまで、このブラウザの記録を種 ID で引き継ぐ。
+// 手紙・ありがとうは、このあと watchers が seeds/{id}/letters から読み込む。
 function applyWorld(list){if(!list)return;const prev=new Map(S.seeds.map(s=>[s.id,s]));
- const keep=s=>{const p=prev.get(s.id);return p?{...s,letters:p.letters||[],unread:!!p.unread,bloomAt:p.bloomAt}:s};
+ const keep=s=>{const p=prev.get(s.id);return p?{...s,letters:p.letters||[],unread:!!p.unread}:s};
  const fromFs=({tile,seed})=>({id:seed.id,x:tile.x,y:tile.y,mine:tile.kind==='own',h:seed.h,f:seed.f,
   t:seed.createdAt?.toMillis?.()||Date.now(),flower:seed.flower||0,letters:[],hidden:seed.status==='hidden'});
- const g=grannySeed();S.seeds=[...sampleSeeds().map(keep),...(g?[g]:[]),...list.map(fromFs).map(keep)];save();rebuildWorld()}
+ const g=grannySeed();S.seeds=[...sampleSeeds().map(keep),...(g?[g]:[]),...list.map(fromFs)];save();rebuildWorld()}
 const U={receivedToday:0,receivedDate:''};
 const dayKey=ms=>{const d=new Date(ms);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
 
@@ -555,6 +559,31 @@ async function receiveSeeds(){if(!FB||delivering||!ready)return;delivering=true;
    S.seeds.push({id,x,y,mine:false,h:r.seed.h,f:r.seed.f,t:r.seed.createdAt?.toMillis?.()||Date.now(),flower:r.seed.flower||0,letters:[]});save()}}}
  finally{delivering=false}}
 
-initUser().then(async u=>{if(u)applyWorld(await loadMyWorld());applyUser(u)}).catch(e=>console.error('[initUser]',e)).finally(()=>{ready=true;sampleThanks();refreshDot();if(!S.introSeen)setTimeout(openHelp,400);
+/* ---------- letters & thanks: 手紙が届く・ありがとうが返る ---------- */
+// 未読：自分の種に、ほかの人（自分以外）から手紙が届いた／自分の手紙に、ありがとうが返ってきた
+function lastEvent(s){if(s.mine)return Math.max(0,...s.letters.filter(l=>l.from!=='me').map(l=>l.t));
+ const l=myLetter(s);return l&&l.thanked?(l.thankedAt||1):0}
+function markSeen(s){if(s.unread){s.unread=false;save()}
+ if(!FB||s.sample||s.granny)return;const e=lastEvent(s);if(e>(SEEN[s.id]||0)){SEEN[s.id]=e;saveUser({['seen.'+s.id]:e})}}
+const watchers=new Map();
+let rebuildT=0;function rebuildSoon(){clearTimeout(rebuildT);rebuildT=setTimeout(()=>{rebuildWorld();save();refreshDot()},60)}
+function stopWatch(id){const f=watchers.get(id);if(f){f();watchers.delete(id)}}
+// 自分の種：届いた手紙をずっと見張る（蒔いた人だけが読める）
+function watchOwn(s){if(!FB||watchers.has(s.id))return;
+ watchers.set(s.id,watchLetters(s.id,ls=>{const me=getUid();
+  s.letters=ls.sort((a,b)=>a.t-b.t).map(l=>({id:l.id,from:l.writerUid===me?'me':'other',text:l.text,t:l.t,thanked:l.thanked,thankedAt:l.thankedAt}));
+  s.unread=lastEvent(s)>(SEEN[s.id]||0);rebuildSoon()}))}
+// 届いた種：自分が書いた手紙に、ありがとうが返ってくるまで見張る（返ったら取り消せないので、そこで終わり）
+function watchReceived(s){if(!FB||watchers.has(s.id))return;
+ watchers.set(s.id,watchMyLetter(s.id,(l,first)=>{
+  if(!l){if(first)stopWatch(s.id);return}
+  const was=!!myLetter(s)?.thanked;
+  s.letters=[{id:l.id,from:'me',text:l.text,t:l.t,thanked:l.thanked,thankedAt:l.thankedAt}];
+  s.unread=lastEvent(s)>(SEEN[s.id]||0);
+  if(l.thanked)stopWatch(s.id);
+  if(l.thanked&&!was&&!first){bloom(s);save();refreshDot()}else rebuildSoon()}))}
+function startWatchers(){for(const s of S.seeds){if(s.sample||s.granny)continue;s.mine?watchOwn(s):watchReceived(s)}}
+
+initUser().then(async u=>{if(u)applyWorld(await loadMyWorld());applyUser(u);startWatchers()}).catch(e=>console.error('[initUser]',e)).finally(()=>{ready=true;sampleThanks();refreshDot();if(!S.introSeen)setTimeout(openHelp,400);
  receiveSeeds();setInterval(receiveSeeds,DELIVERY_INTERVAL);setInterval(sampleThanks,60*1000)});
 })();

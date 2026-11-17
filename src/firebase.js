@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, connectAuthEmulator } from 'firebase/auth';
 import { getFirestore, doc, getDoc, getDocs, setDoc, updateDoc, collection, writeBatch, serverTimestamp, connectFirestoreEmulator,
-  query, where, orderBy, limit, startAfter, runTransaction } from 'firebase/firestore';
+  query, where, orderBy, limit, startAfter, runTransaction, onSnapshot } from 'firebase/firestore';
 
 const env = import.meta.env;
 const config = {
@@ -147,4 +147,45 @@ export function receiveSeed(seedId, x, y, today, dailyMax) {
     tx.update(userRef, { receivedToday: count + 1, receivedDate: today });
     return { seed: { id: seedId, ...s }, count: count + 1 };
   });
+}
+
+/* ---------- 手紙とありがとう（seeds/{seedId}/letters/{書いた人の uid}） ---------- */
+export const getUid = () => myUid;
+const letterOf = d => {
+  const x = d.data({ serverTimestamps: 'estimate' });
+  return { id: d.id, writerUid: x.writerUid, text: x.text, t: x.createdAt?.toMillis?.() || Date.now(),
+    thanked: !!x.thanked, thankedAt: x.thankedAt?.toMillis?.() || 0 };
+};
+
+/** 自分の種に届いた手紙を見張る（蒔いた人だけが読める）。cb(letters, isFirst) */
+export function watchLetters(seedId, cb) {
+  if (!myUid) return () => {};
+  let first = true;
+  return onSnapshot(collection(db, 'seeds', seedId, 'letters'), snap => {
+    cb(snap.docs.map(letterOf), first); first = false;
+  }, e => console.error('[watchLetters]', e));
+}
+
+/** 自分がほかの種に書いた手紙を見張る（ありがとうが返ってくるのを待つ）。cb(letter|null, isFirst) */
+export function watchMyLetter(seedId, cb) {
+  if (!myUid) return () => {};
+  let first = true;
+  return onSnapshot(doc(db, 'seeds', seedId, 'letters', myUid), snap => {
+    cb(snap.exists() ? letterOf(snap) : null, first); first = false;
+  }, e => console.error('[watchMyLetter]', e));
+}
+
+/** 手紙を書く（1 つの種に 1 人 1 回。ドキュメント ID が自分の uid）。 */
+export function writeLetter(seedId, text) {
+  if (!myUid) return Promise.resolve();
+  return setDoc(doc(db, 'seeds', seedId, 'letters', myUid),
+    { writerUid: myUid, text, createdAt: serverTimestamp(), thanked: false, thankedAt: null })
+    .catch(e => console.error('[writeLetter]', e));
+}
+
+/** ありがとうを返す（蒔いた人だけ。取り消しはできない）。 */
+export function thankLetter(seedId, writerUid) {
+  if (!myUid) return Promise.resolve();
+  return updateDoc(doc(db, 'seeds', seedId, 'letters', writerUid), { thanked: true, thankedAt: serverTimestamp() })
+    .catch(e => console.error('[thankLetter]', e));
 }
