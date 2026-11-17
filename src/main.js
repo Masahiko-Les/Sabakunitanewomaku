@@ -1,5 +1,8 @@
 import './style.css';
-import { initUser, saveUser } from './firebase.js';
+import { initUser, saveUser, loadMyWorld, plantSeed } from './firebase.js';
+
+// 見本の種 8 つを置くか（未決事項。決まるまでは試作版と同じく置く）
+const USE_SAMPLES = import.meta.env.VITE_USE_SAMPLES !== 'false';
 
 (()=>{
 const TILE=48, N=100, WORLD=TILE*N, STORM_GAP=10;
@@ -60,15 +63,11 @@ const KEY='sabaku-ni-tane-v3';
 let S={seeds:[],init:false,introSeen:false};
 let ready=false; // users/{uid} を読み終えるまで操作を受け付けない
 const FLOWERS=[{p:'#f29bb0',c:'#f7d36b',n:5,g:'255,150,180'},{p:'#f7c948',c:'#c97b2b',n:8,g:'255,210,90'},{p:'#ffffff',c:'#f2c14e',n:6,g:'255,250,235'},{p:'#b79be8',c:'#f5e08a',n:5,g:'190,160,255'},{p:'#f59a7a',c:'#fff1c1',n:6,g:'255,170,130'}];
-const DEMO_LETTERS=[
- '読ませてくれてありがとう。\n向き合い方まで書けるあなたは、もう一歩進んでいると思います。',
- '同じような気持ちになることがあります。\nひとりじゃないですよ。',
- 'その工夫、とてもすてきです。\nわたしも真似してみたくなりました。',
- '無理しすぎないでくださいね。\n今日ここに書いてくれただけで、十分だと思います。'];
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function load(){try{localStorage.removeItem('sabaku-ni-tane-v1');localStorage.removeItem('sabaku-ni-tane-v2');const r=localStorage.getItem(KEY);if(r)S=JSON.parse(r)}catch(e){}
- if(!S.init){S.seeds=SAMPLES.map(([dx,dy,h,f,bloom,sprout],i)=>({id:'s'+i,x:50+dx,y:50+dy,mine:false,h,f,t:Date.now()-86400000*(i+1),flower:i%5,letters:[],bloom,sprout}));S.init=true;save()}}
+ if(!S.init){S.seeds=sampleSeeds();S.init=true;save()}}
+function sampleSeeds(){return USE_SAMPLES?SAMPLES.map(([dx,dy,h,f,bloom,sprout],i)=>({id:'s'+i,x:50+dx,y:50+dy,mine:false,h,f,t:Date.now()-86400000*(i+1),flower:i%5,letters:[],bloom,sprout})):[]}
 load();
 const thanksOf=s=>(s.bloom||0)+s.letters.filter(l=>l.thanked).length;
 const stageOf=s=>thanksOf(s)>0?'flower':(s.letters.length||s.sprout)?'sprout':'seed';
@@ -335,7 +334,8 @@ $('#btnPlant').onclick=()=>{if(!ready)return;const pi=plantState();if(!pi.ok)ret
   el.querySelector('#x').onclick=closeSheet;
   ok.onclick=()=>{if(seedOn(pi.tx,pi.ty)){closeSheet();return}
    const crisis=CRISIS.test(h.value+f.value);
-   S.seeds.push({id:uid(),x:pi.tx,y:pi.ty,mine:true,h:h.value.trim(),f:f.value.trim(),t:Date.now(),flower:Math.floor(Math.random()*5),letters:[],plantedAt:performance.now(),hidden:crisis});save();
+   const sd={x:pi.tx,y:pi.ty,h:h.value.trim(),f:f.value.trim(),flower:Math.floor(Math.random()*5),hidden:crisis};
+   S.seeds.push({id:plantSeed(sd).id||uid(),...sd,mine:true,t:Date.now(),letters:[],plantedAt:performance.now()});save();
    const sx=(pi.tx+.5)*TILE;for(const dx of[-TILE*.75,TILE*.75]){if(!solid(sx+dx,P.y+10)){P.x=sx+dx;break}}
    if(crisis){openSheet(`<div class="kicker">種を預かりました</div>${careHTML()}<p class="note">この種は、ほかの人には見えない場所にそっと置いておきます。（公開版では、管理者が確認してから扱いを決める想定です）</p><div class="row"><button class="btn main small" id="x">閉じる</button></div>`,e=>e.querySelector('#x').onclick=closeSheet)}
    else{closeSheet();toast('種を蒔きました')}}})};
@@ -489,19 +489,11 @@ function openHelp(){openSheet(`<div class="help"><div class="kicker">この世�
  <p>種には、抱えている生きづらさと、それにどう向き合っているかを書きます。誰かの種を見つけたら、優しい言葉の手紙で水をあげてください。手紙は蒔いた人にだけ届き、名前はどこにも表示されません。</p>
  <p>蒔いた人が「ありがとう」を返すと花が咲き、まわり8マスの砂が緑に変わります。そこにまた種が蒔けるようになります。緑が広がるほど嵐はやわらぎ、世界は少しずつ先へひらけていきます。</p>
  <p>焚き火のそばのおばあちゃんに話しかけると、この世界のことや、種の蒔き方・水やりのこつを教えてくれます。</p>
- <p class="note">砂漠をタップすると歩けます（パソコンでは矢印キーでも）。右上の ☾ で昼と夜を切り替えられます（ふだんは時刻に合わせて変わります）。<br>【試作版】データはこのブラウザの中だけに保存されます。架空の村人の種がいくつか置いてあり、あなたの種にも、しばらくすると架空の村人から手紙が届きます。</p>
+ <p class="note">砂漠をタップすると歩けます（パソコンでは矢印キーでも）。右上の ☾ で昼と夜を切り替えられます（ふだんは時刻に合わせて変わります）。<br>【試作版】データはこのブラウザの中だけに保存されます。架空の村人の種がいくつか置いてあります。</p>
  <div class="row"><button class="btn ghost small" id="rst">データを消す</button><button class="btn main small" id="x">歩きはじめる</button></div></div>`,el=>{
   el.querySelector('#x').onclick=()=>{const first=(S.tutorial||0)<1;S.introSeen=true;save();saveUser({introSeen:true});closeSheet();if(first)setTimeout(()=>toast('焚き火のそばのおばあちゃんに、話しかけてみよう'),500)};
   const r=el.querySelector('#rst');r.onclick=()=>{if(r.dataset.c){try{localStorage.removeItem(KEY)}catch(e){}S={seeds:[],init:false,introSeen:true};load();ensureGranny();S.introSeen=true;save();saveUser({tutorial:0,metGranny:false,introSeen:true,grannyLetter:null});rebuildWorld();P.x=VC.x+30;P.y=VC.y+85;closeSheet();toast('世界をはじめの姿に戻しました')}else{r.dataset.c=1;r.textContent='本当に消す'}}})}
 $('#btnHelp').onclick=()=>{if(ready)openHelp()};
-
-/* ---------- demo villagers ---------- */
-function tickDemo(){const now=Date.now();let ch=false;
- for(const s of S.seeds){
-  if(s.mine&&!s.hidden&&!s.demoSent&&now-s.t>20000){s.letters.push({id:uid(),from:'other',text:DEMO_LETTERS[Math.floor(Math.random()*DEMO_LETTERS.length)],t:now,thanked:false});s.demoSent=true;s.unread=true;ch=true}
-  if(!s.mine&&!s.granny){const l=myLetter(s);if(l&&!l.thanked&&now-l.t>9000){l.thanked=true;l.thankedAt=now;s.unread=true;ch=true;bloom(s)}}}
- if(ch){save();refreshDot()}}
-setInterval(tickDemo,2000);
 
 /* ---------- loop ---------- */
 let last=performance.now();
@@ -513,5 +505,12 @@ requestAnimationFrame(frame);refreshDot();
 function applyUser(u){if(!u)return;S.tutorial=u.tutorial||0;S.metGranny=!!u.metGranny;S.introSeen=!!u.introSeen;
  const g=grannySeed();if(g)g.letters=u.grannyLetter?[{id:'granny-letter',from:'me',text:u.grannyLetter,t:Date.now(),thanked:S.tutorial>=2}]:[];
  save();rebuildWorld()}
-initUser().then(applyUser).catch(e=>console.error('[initUser]',e)).finally(()=>{ready=true;refreshDot();if(!S.introSeen)setTimeout(openHelp,400)});
+// 自分の世界の種は worlds/{uid}/tiles と seeds を正とする。
+// 手紙・ありがとう・未読はフェーズ5で Firestore に移すまで、このブラウザの記録を種 ID で引き継ぐ。
+function applyWorld(list){if(!list)return;const prev=new Map(S.seeds.map(s=>[s.id,s]));
+ const keep=s=>{const p=prev.get(s.id);return p?{...s,letters:p.letters||[],unread:!!p.unread,bloomAt:p.bloomAt}:s};
+ const fromFs=({tile,seed})=>({id:seed.id,x:tile.x,y:tile.y,mine:tile.kind==='own',h:seed.h,f:seed.f,
+  t:seed.createdAt?.toMillis?.()||Date.now(),flower:seed.flower||0,letters:[],hidden:seed.status==='hidden'});
+ const g=grannySeed();S.seeds=[...sampleSeeds().map(keep),...(g?[g]:[]),...list.map(fromFs).map(keep)];save();rebuildWorld()}
+initUser().then(async u=>{if(u)applyWorld(await loadMyWorld());applyUser(u)}).catch(e=>console.error('[initUser]',e)).finally(()=>{ready=true;refreshDot();if(!S.introSeen)setTimeout(openHelp,400)});
 })();

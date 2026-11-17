@@ -1,14 +1,49 @@
 rules_version = '2';
-// フェーズ2：users/{uid} だけを許可する。
-// seeds / worlds / letters はフェーズ3以降で追加し、フェーズ6で Emulator テストとあわせて仕上げる。
+// フェーズ3：users / seeds（読む・蒔く）/ worlds/{uid}/tiles（自分の種の配置）。
+// 配達（seeds の update と received のタイル）はフェーズ4、手紙はフェーズ5で追加し、
+// フェーズ6で Emulator テストとあわせて仕上げる。
 service cloud.firestore {
   match /databases/{db}/documents {
     function signedIn() { return request.auth != null; }
     function me() { return request.auth.uid; }
+    function isTile(v) { return v is int && v >= 0 && v < 100; }
 
     match /users/{uid} {
       allow read, create, update: if signedIn() && me() == uid;
       allow delete: if false;
+    }
+
+    match /worlds/{uid}/tiles/{seedId} {
+      allow read: if signedIn() && me() == uid;
+      allow create: if signedIn() && me() == uid
+        && request.resource.data.keys().hasOnly(['seedId','x','y','kind','placedAt'])
+        && request.resource.data.seedId == seedId
+        && isTile(request.resource.data.x) && isTile(request.resource.data.y)
+        && request.resource.data.placedAt == request.time
+        && request.resource.data.kind == 'own'
+        && getAfter(/databases/$(db)/documents/seeds/$(seedId)).data.ownerUid == uid;
+      allow update, delete: if false;
+    }
+
+    match /seeds/{seedId} {
+      allow read: if signedIn()
+        && (resource.data.status == 'public' || resource.data.ownerUid == me());
+
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['ownerUid','h','f','flower','createdAt','status','open','deliveredCount','deliveredTo'])
+        && request.resource.data.ownerUid == me()
+        && request.resource.data.h is string && request.resource.data.h.size() > 0 && request.resource.data.h.size() <= 60
+        && request.resource.data.f is string && request.resource.data.f.size() > 0 && request.resource.data.f.size() <= 240
+        && request.resource.data.flower is int && request.resource.data.flower >= 0 && request.resource.data.flower <= 4
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.status in ['public', 'hidden']
+        && request.resource.data.deliveredCount == 0
+        && request.resource.data.deliveredTo.size() == 0
+        && request.resource.data.open == (request.resource.data.status == 'public')
+        // 種は、自分の世界のタイルと同時にしか蒔けない
+        && existsAfter(/databases/$(db)/documents/worlds/$(me())/tiles/$(seedId));
+
+      allow update, delete: if false;
     }
   }
 }
