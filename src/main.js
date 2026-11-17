@@ -1,6 +1,6 @@
 import './style.css';
 import { enabled as FB, initUser, saveUser, loadMyWorld, plantSeed, findDeliverable, receiveSeed,
-  getUid, watchLetters, watchMyLetter, writeLetter, thankLetter } from './firebase.js';
+  getUid, watchLetters, watchMyLetter, writeLetter, thankLetter, resetAll } from './firebase.js';
 
 // 見本の種 8 つを置くか。公開版では置かない（最初は種も花もない）。VITE_USE_SAMPLES=true で試作版と同じく置く
 const USE_SAMPLES = import.meta.env.VITE_USE_SAMPLES === 'true';
@@ -176,11 +176,13 @@ function update(dt,now){
  plantInfo=plantState();if(plantInfo.label!==plantLabel){plantLabel=plantInfo.label;const b=$('#btnPlant');b.textContent=plantLabel;b.disabled=!plantInfo.ok}}
 
 /* ---------- sky ---------- */
-let night=0,skyOverride=null;
+// 昼と夜：設定で「時刻に合わせる／昼／夜」を選ぶ（このブラウザに覚えておく）
+const SKY_KEY='sabaku-sky';
+let night=0,skyOverride=(()=>{try{const v=localStorage.getItem(SKY_KEY);return v==='night'?true:v==='day'?false:null}catch(e){return null}})();
 const autoNight=()=>{const h=new Date().getHours();return h>=18||h<6};
 const skyNight=()=>skyOverride===null?autoNight():skyOverride;
-$('#btnSky').onclick=()=>{skyOverride=!skyNight();if(skyOverride===autoNight())skyOverride=null;$('#btnSky').textContent=skyNight()?'☀':'☾'};
-$('#btnSky').textContent=skyNight()?'☀':'☾';
+const skyMode=()=>skyOverride===null?'auto':skyOverride?'night':'day';
+function setSky(m){skyOverride=m==='auto'?null:m==='night';try{localStorage.setItem(SKY_KEY,m)}catch(e){}}
 night=skyNight()?1:0;
 
 /* ---------- drawing ---------- */
@@ -501,7 +503,33 @@ function openHelp(){openSheet(`<div class="help"><div class="kicker">この世�
  <p class="note">砂漠をタップすると歩けます（パソコンでは矢印キーでも）。右上の ☾ で昼と夜を切り替えられます（ふだんは時刻に合わせて変わります）。</p>
  <div class="row"><button class="btn main small" id="x">歩きはじめる</button></div></div>`,el=>{
   el.querySelector('#x').onclick=()=>{const first=(S.tutorial||0)<1;S.introSeen=true;save();saveUser({introSeen:true});closeSheet();if(first)setTimeout(()=>toast('焚き火のそばのおばあちゃんに、話しかけてみよう'),500)}})}
-$('#btnHelp').onclick=()=>{if(ready)openHelp()};
+
+/* ---------- settings ---------- */
+// 利用規約などのページ（public/ に置いた下書き）
+const LINKS=[['利用規約','/terms.html'],['プライバシーポリシー','/privacy.html'],['お問い合わせ','/contact.html']];
+const RESET_KEY='sabaku-reset';
+function openSettings(){
+ const seg=[['auto','時刻に合わせる'],['day','昼'],['night','夜']].map(([k,t])=>`<button data-sky="${k}"${k===skyMode()?' class="on"':''}>${t}</button>`).join('');
+ openSheet(`<div class="settings"><div class="kicker">設定</div><h2>設定</h2>
+ <button class="list-item go" id="sHelp">この世界について</button>
+ <label>昼と夜</label><div class="seg">${seg}</div>
+ <div class="gap"></div><button class="list-item go" id="sCare">困ったときの相談先</button>
+ <label>データについて</label><p class="data">名前や連絡先は保存しません。種と手紙は、このブラウザに結びついた記録として保存されます。ブラウザのデータを消したり、別の端末で開いたりすると、自分の世界には戻れません。</p>
+ <div class="row" style="justify-content:flex-start;margin-top:8px"><button class="btn ghost small" id="rst" style="padding-left:0">すべてのデータを消す</button></div>
+ <div class="gap"></div>${LINKS.map(([t,u])=>`<a class="list-item go" href="${u}" target="_blank" rel="noopener">${t}</a>`).join('')}
+ <div class="row"><button class="btn main small" id="x">閉じる</button></div></div>`,el=>{
+  el.querySelector('#x').onclick=closeSheet;
+  el.querySelector('#sHelp').onclick=openHelp;
+  el.querySelector('#sCare').onclick=openCare;
+  el.querySelectorAll('[data-sky]').forEach(b=>b.onclick=()=>{setSky(b.dataset.sky);el.querySelectorAll('[data-sky]').forEach(x=>x.classList.toggle('on',x===b))});
+  const r=el.querySelector('#rst');r.onclick=async()=>{if(!r.dataset.c){r.dataset.c=1;r.textContent='本当に消す';return}
+   if(r.dataset.busy)return;r.dataset.busy=1;
+   // 自分の記録と自分の世界を消し、新しい匿名アカウントで最初から（ほかの人の世界にある種や手紙はそのまま）
+   try{await resetAll()}catch(e){console.error('[resetAll]',e)}
+   try{localStorage.removeItem(KEY);sessionStorage.setItem(RESET_KEY,'1')}catch(e){}
+   location.reload()}})}
+function openCare(){openSheet(`<div class="kicker">困ったときの相談先</div>${contactsHTML()}<div class="row"><button class="btn main small" id="x">閉じる</button></div>`,e=>e.querySelector('#x').onclick=closeSheet)}
+$('#btnSet').onclick=()=>{if(ready)openSettings()};
 
 /* ---------- loop ---------- */
 let last=performance.now();
@@ -583,6 +611,10 @@ function watchReceived(s){if(!FB||watchers.has(s.id))return;
   if(l.thanked&&!was&&!first){bloom(s);save();refreshDot()}else rebuildSoon()}))}
 function startWatchers(){for(const s of S.seeds){if(s.sample||s.granny)continue;s.mine?watchOwn(s):watchReceived(s)}}
 
-initUser().then(async u=>{if(u)applyWorld(await loadMyWorld());applyUser(u);startWatchers()}).catch(e=>console.error('[initUser]',e)).finally(()=>{ready=true;sampleThanks();refreshDot();if(!S.introSeen)setTimeout(openHelp,400);
+initUser().then(async u=>{if(u)applyWorld(await loadMyWorld());applyUser(u);startWatchers()}).catch(e=>console.error('[initUser]',e)).finally(()=>{ready=true;sampleThanks();refreshDot();
+ // 「すべてのデータを消す」のあと：試作版と同じく、説明は出さずに「世界をはじめの姿に戻しました」
+ let wasReset=false;try{wasReset=!!sessionStorage.getItem(RESET_KEY);sessionStorage.removeItem(RESET_KEY)}catch(e){}
+ if(wasReset){S.introSeen=true;save();saveUser({introSeen:true});setTimeout(()=>toast('世界をはじめの姿に戻しました'),400)}
+ else if(!S.introSeen)setTimeout(openHelp,400);
  receiveSeeds();setInterval(receiveSeeds,DELIVERY_INTERVAL);setInterval(sampleThanks,60*1000)});
 })();

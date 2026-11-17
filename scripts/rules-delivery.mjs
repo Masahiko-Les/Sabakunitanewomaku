@@ -1,5 +1,5 @@
 // ルール確認：配達（5 つの世界へ・1 日 3 つまで・ずるの拒否）。前提：Emulator が動いていること（npm run test:rules）
-import { doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { client, plant, deliver, adminPatch, expect, done } from './rules-lib.mjs';
 
 const [A, B, C] = await Promise.all(['A', 'B', 'C'].map(client));
@@ -19,6 +19,10 @@ await expect(false, '1 日の受け取り数を 2 つ増やして受け取る', 
 await expect(true, 'B が正しく受け取る', () => deliver(B, s1));
 await expect(false, 'B が同じ種をもう一度受け取る', () => deliver(B, s1));
 await expect(false, '届いたタイルを動かす', () => updateDoc(doc(B.db, 'worlds', B.uid, 'tiles', s1), { x: 10 }));
+// 届いたタイルを消しても、同じ種をもう一度受け取ることはできない（B の今日の受け取りはまだ 1 つ）
+await expect(true, 'B が届いたタイルを消す（すべてのデータを消す）', () => deleteDoc(doc(B.db, 'worlds', B.uid, 'tiles', s1)));
+await expect(false, 'タイルを消したあと、同じ種をもう一度受け取る', () => deliver(B, s1));
+
 
 const hid = await plant(A, { status: 'hidden', open: false });
 await expect(false, 'hidden の種を受け取る', () => deliver(B, hid, { seedPatch: () => ({ open: true }) }));

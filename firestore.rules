@@ -64,7 +64,8 @@ service cloud.firestore {
         && okUser(request.resource.data)
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['createdAt'])
         && okCount(resource.data, request.resource.data);
-      allow delete: if false;
+      // 「すべてのデータを消す」：自分の記録だけは消せる
+      allow delete: if signedIn() && me() == uid;
     }
 
     match /worlds/{uid}/tiles/{seedId} {
@@ -83,7 +84,9 @@ service cloud.firestore {
             && !(uid in get(/databases/$(db)/documents/seeds/$(seedId)).data.deliveredTo)
             && uid in getAfter(/databases/$(db)/documents/seeds/$(seedId)).data.deliveredTo)
         );
-      allow update, delete: if false;
+      allow update: if false;
+      // 「すべてのデータを消す」：自分の世界のタイルだけは消せる（消しても、同じ種はもう受け取れない）
+      allow delete: if signedIn() && me() == uid;
     }
 
     match /seeds/{seedId} {

@@ -8,6 +8,7 @@ header h1{font-size:15px;font-weight:500;letter-spacing:.22em;margin:0;color:rgb
 body.night header h1{color:rgba(240,230,210,.7)}
 .hbtns{display:flex;gap:8px}
 .iconbtn{pointer-events:auto;width:34px;height:34px;border-radius:50%;border:none;background:rgba(255,250,242,.75);backdrop-filter:blur(6px);color:var(--sub);font:inherit;font-size:15px;cursor:pointer}
+.iconbtn svg{display:block;margin:auto}
 body.night .iconbtn{background:rgba(40,40,60,.55);color:#e9dcc4}
 .bar{position:fixed;left:0;right:0;bottom:0;display:flex;gap:10px;justify-content:center;padding:0 16px 22px;pointer-events:none}
 .bar .btn{pointer-events:auto;white-space:nowrap}
@@ -67,3 +68,14 @@ textarea:focus{border-color:#e0b48e}
 .contacts .num{display:inline-block;font-size:18px;font-weight:700;color:var(--ink);text-decoration:none;margin-right:8px;letter-spacing:.03em}
 .contacts .lk{display:block;margin-top:10px}
 @keyframes fadein{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* 設定 */
+.settings label{margin-top:18px}
+.settings .go{position:relative;padding-right:32px}
+.settings .go::after{content:'›';position:absolute;right:14px;top:50%;transform:translateY(-52%);color:var(--sub);font-size:18px}
+.settings a.go{text-decoration:none}
+.settings .gap{height:10px}
+.settings .data{font-size:13.5px;line-height:1.85;color:var(--sub);margin:0}
+.seg{display:flex;gap:6px}
+.seg button{flex:1;font:inherit;font-size:13.5px;padding:10px 0;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer;transition:background .2s,color .2s}
+.seg button.on{background:var(--accent);border-color:var(--accent);color:#fff}

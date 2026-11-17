@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged, connectAuthEmulator } from 'firebase/auth';
-import { getFirestore, doc, getDoc, getDocs, setDoc, updateDoc, collection, writeBatch, serverTimestamp, connectFirestoreEmulator,
+import { getAuth, signInAnonymously, onAuthStateChanged, connectAuthEmulator, deleteUser, signOut } from 'firebase/auth';
+import { getFirestore, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, writeBatch, serverTimestamp, connectFirestoreEmulator,
   query, where, orderBy, limit, startAfter, runTransaction, onSnapshot } from 'firebase/firestore';
 
 const env = import.meta.env;
@@ -191,4 +191,26 @@ export function thankLetter(seedId, writerUid) {
   if (!myUid) return Promise.resolve();
   return updateDoc(doc(db, 'seeds', seedId, 'letters', writerUid), { thanked: true, thankedAt: serverTimestamp() })
     .catch(e => console.error('[thankLetter]', e));
+}
+
+/**
+ * すべてのデータを消す：自分の世界（worlds/{uid}/tiles）と users/{uid} を消し、匿名アカウントも消す。
+ * ほかの人の世界にある自分の種や、ほかの種に書いた手紙は、だれのものかわからない形でそのまま残る。
+ * 次に開くと、新しい匿名アカウントで最初から始まる。
+ */
+export async function resetAll() {
+  if (!myUid) return;
+  try {
+    const tiles = await getDocs(collection(db, 'worlds', myUid, 'tiles'));
+    for (let i = 0; i < tiles.docs.length; i += 400) {
+      const b = writeBatch(db);
+      tiles.docs.slice(i, i + 400).forEach(d => b.delete(d.ref));
+      await b.commit();
+    }
+    await deleteDoc(userRef);
+  } finally {
+    // 匿名アカウントを消す（消せなければ、ログアウトだけして新しく始める）
+    try { await deleteUser(auth.currentUser); } catch (e) { await signOut(auth).catch(() => {}); }
+    myUid = null; userRef = null;
+  }
 }

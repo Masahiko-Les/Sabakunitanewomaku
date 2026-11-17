@@ -25,7 +25,7 @@ await expect(true, 'アプリと同じ初期値で作る', () => setDoc(U(F), { 
 await expect(true, 'A が自分の users を読む', () => getDoc(U(A)));
 await expect(false, 'B が A の users を読む', () => getDoc(U({ db: B.db, uid: A.uid })));
 await expect(false, 'B が A の users を書き換える', () => updateDoc(doc(B.db, 'users', A.uid), { tutorial: 3 }));
-await expect(false, 'A が自分の users を消す', () => deleteDoc(U(A)));
+await expect(false, 'B が A の users を消す', () => deleteDoc(doc(B.db, 'users', A.uid)));
 
 // アプリが書く内容
 await expect(true, '講習を進める（tutorial 1, metGranny）', () => updateDoc(U(A), { tutorial: 1, metGranny: true }));
@@ -46,5 +46,8 @@ await expect(false, '見本の種への手紙が 301 字', () => updateDoc(U(A),
 await expect(false, '見本の種への手紙に余計なフィールド', () => updateDoc(U(A), { 'sampleLetters.s1': { text: 'x', t: 1, thanked: false, to: 'B' } }));
 await expect(false, '1 日の受け取り数を 4 にする', () => updateDoc(U(A), { receivedToday: 4 }));
 await expect(false, '受け取りの日付の形がおかしい', () => updateDoc(U(A), { receivedDate: 'tomorrow' }));
+
+// 「すべてのデータを消す」
+await expect(true, 'A が自分の users を消す（すべてのデータを消す）', () => deleteDoc(U(A)));
 
 done();

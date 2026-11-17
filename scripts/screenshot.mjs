@@ -45,16 +45,23 @@ async function shoot(url, prefix, useLocalStorage) {
   await page.screenshot({ path: `${OUT}/${prefix}_day.png` });
 
   // Night
-  await page.click('#btnSky');
+  // 試作版は ☾ ボタン、公開版は設定（⚙）の「夜」
+  const sky = async m => {
+    if (await page.$('#btnSky')) { await page.click('#btnSky'); return; }
+    await page.click('#btnSet'); await page.waitForTimeout(400);
+    await page.click(`[data-sky="${m}"]`); await page.click('#x'); await page.waitForTimeout(400);
+  };
+  await sky('night');
   await page.waitForTimeout(1800);
   await page.screenshot({ path: `${OUT}/${prefix}_night.png` });
 
   // Back to day
-  await page.click('#btnSky');
+  await sky('day');
   await page.waitForTimeout(500);
 
   // Help sheet
-  await page.click('#btnHelp');
+  if (await page.$('#btnHelp')) await page.click('#btnHelp');
+  else { await page.click('#btnSet'); await page.waitForTimeout(400); await page.click('#sHelp'); }
   await page.waitForTimeout(600);
   await page.screenshot({ path: `${OUT}/${prefix}_help.png` });
   await page.evaluate(() => document.querySelector('.scrim')?.click());
