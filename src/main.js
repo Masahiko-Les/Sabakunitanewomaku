@@ -1,4 +1,5 @@
 import './style.css';
+import { initUser, saveUser } from './firebase.js';
 
 (()=>{
 const TILE=48, N=100, WORLD=TILE*N, STORM_GAP=10;
@@ -57,6 +58,7 @@ const decor=new Uint8Array(N*N), decoList=[];
 /* ---------- state ---------- */
 const KEY='sabaku-ni-tane-v3';
 let S={seeds:[],init:false,introSeen:false};
+let ready=false; // users/{uid} を読み終えるまで操作を受け付けない
 const FLOWERS=[{p:'#f29bb0',c:'#f7d36b',n:5,g:'255,150,180'},{p:'#f7c948',c:'#c97b2b',n:8,g:'255,210,90'},{p:'#ffffff',c:'#f2c14e',n:6,g:'255,250,235'},{p:'#b79be8',c:'#f5e08a',n:5,g:'190,160,255'},{p:'#f59a7a',c:'#fff1c1',n:6,g:'255,170,130'}];
 const DEMO_LETTERS=[
  '読ませてくれてありがとう。\n向き合い方まで書けるあなたは、もう一歩進んでいると思います。',
@@ -111,7 +113,7 @@ let target=null,pendingOpen=null,moving=false,lastStep={x:P.x,y:P.y},tapFx=null,
 const prints=[],sparks=[],keys={};
 const dust=Array.from({length:150},()=>({x:Math.random()*1400-200,y:Math.random()*1000-100,v:180+Math.random()*220,len:8+Math.random()*22}));
 const flies=Array.from({length:16},(_, i)=>({a:Math.random()*6.28,r:40+Math.random()*150,s:.2+Math.random()*.4,ph:Math.random()*6.28}));
-addEventListener('keydown',e=>{if(sheetOpen)return;const k=e.key;if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','w','a','s','d'].includes(k)){keys[k]=1;e.preventDefault()}});
+addEventListener('keydown',e=>{if(sheetOpen||!ready)return;const k=e.key;if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','w','a','s','d'].includes(k)){keys[k]=1;e.preventDefault()}});
 addEventListener('keyup',e=>{keys[e.key]=0});
 
 function solid(wx,wy){const[tx,ty]=tileOf(wx,wy);
@@ -124,7 +126,7 @@ function solid(wx,wy){const[tx,ty]=tileOf(wx,wy);
  return false}
 function stormMsg(){const n=performance.now();if(n-lastStormMsg>4500){lastStormMsg=n;toast('砂嵐が強くて、この先へは進めない')}}
 
-cv.addEventListener('pointerdown',e=>{if(sheetOpen)return;
+cv.addEventListener('pointerdown',e=>{if(sheetOpen||!ready)return;
  const wx=e.clientX+cam.x,wy=e.clientY+cam.y;tapFx={x:wx,y:wy,t:performance.now()};
  if(Math.hypot(wx-GRAN.x,wy-GRAN.y+8)<26){if(Math.hypot(P.x-GRAN.x,P.y-GRAN.y)<120)openGranny();else{target={x:GRAN.x-6,y:GRAN.y+42};pendingOpen='granny'}return}
  if(Math.hypot(wx-FIRE.x,wy-FIRE.y+8)<26&&Math.hypot(P.x-FIRE.x,P.y-FIRE.y)<130){toast('焚き火が、静かに燃えている');return}
@@ -321,7 +323,7 @@ function bloom(s){s.bloomAt=Date.now();const before=storm.reduce((a,v)=>a+(v>.5)
  setTimeout(()=>toast(after<before?'花のまわりに緑が広がり、嵐が少しやわらいだ':'花のまわりに、緑が広がった'),900)}
 
 /* ---------- plant ---------- */
-$('#btnPlant').onclick=()=>{const pi=plantState();if(!pi.ok)return;
+$('#btnPlant').onclick=()=>{if(!ready)return;const pi=plantState();if(!pi.ok)return;
  openSheet(`<div class="kicker">種を蒔く</div><h2>このマスに、ひとつ種を蒔きます</h2>
  <label>① 抱えている生きづらさ（2行まで）</label><textarea id="tH" rows="2" maxlength="60" placeholder="たとえば：人前で話すとき、言葉が出てこない"></textarea><div class="count" id="cH"></div>
  <label>② それに、どう向き合っているか（8行まで）</label><textarea id="tF" rows="6" maxlength="240" placeholder="うまくいかなくても、試していること・支えになっていること"></textarea><div class="count" id="cF"></div>
@@ -375,7 +377,7 @@ function openMine(s){
 /* ---------- my seeds list ---------- */
 function goTo(s){const cx=(s.x+.5)*TILE,cy=(s.y+.5)*TILE;P.x=cx-TILE;P.y=cy-10;if(solid(P.x,P.y+10))P.x=cx+TILE;
  cam.x=clamp(P.x-vw/2,0,WORLD-vw);cam.y=clamp(P.y-vh*.45,0,WORLD-vh);prints.length=0;lastStep={x:P.x,y:P.y};target=null}
-$('#btnMine').onclick=()=>{
+$('#btnMine').onclick=()=>{if(!ready)return;
  const mine=S.seeds.filter(s=>s.mine).sort((a,b)=>b.t-a.t),wat=S.seeds.filter(s=>!s.mine&&myLetter(s));
  const item=s=>`<button class="list-item" data-go="${s.id}">${s.unread?'<span class="dot" style="margin:0 6px 0 0"></span>':''}${esc(s.h.split('\n')[0])}<div class="s">${s.hidden?'見えない場所に置いてあります':stageText[stageOf(s)]}${s.mine&&s.letters.length?` ・ 手紙 ${s.letters.length}通`:''}${!s.mine&&myLetter(s).thanked?' ・ ありがとうが返ってきました':''}</div></button>`;
  openSheet(`<div class="kicker">わたしの種</div>
@@ -456,7 +458,7 @@ function talkSheet(build){openSheet(`<div class="kicker">焚き火のそばの�
  build({say,you,play,button,ctl,scroll})})}
 function grannySeed(){return S.seeds.find(s=>s.granny)}
 function walkToGrannySeed(){const g=grannySeed();if(!g)return;target={x:(g.x+.5)*TILE+TILE,y:(g.y+.5)*TILE-10};pendingOpen=g.id}
-function finishTutorial(){S.tutorial=3;S.metGranny=true;save();closeSheet();setTimeout(()=>toast('緑の上に立って、種を蒔いてみよう'),400)}
+function finishTutorial(){S.tutorial=3;S.metGranny=true;save();saveUser({tutorial:3,metGranny:true});closeSheet();setTimeout(()=>toast('緑の上に立って、種を蒔いてみよう'),400)}
 function grannyThanks(){talkSheet(({play,button})=>play(TUT.reading,()=>button('花を見る',()=>{
  const g=grannySeed(),l=g&&myLetter(g);if(l&&!l.thanked){l.thanked=true;l.thankedAt=Date.now();save()}
  closeSheet();if(g)bloom(g);
@@ -470,9 +472,9 @@ function openGrannySeed(s){const mine=myLetter(s),tu=S.tutorial||0;
  else{body+=`<div class="letter"><div class="from">あなたがおばあちゃんに届けた手紙</div><div class="txt">${esc(mine.text)}</div></div><p class="state">${mine.thanked?'おばあちゃんから、ありがとうが返ってきました。':'おばあちゃんが、手紙を読んでいます。'}</p><div class="row"><button class="btn soft small" id="x">閉じる</button></div>`}
  openSheet(body,el=>{el.querySelector('#x').onclick=closeSheet;const ta=el.querySelector('#tL');if(!ta)return;
   const ok=el.querySelector('#ok');lineLimit(ta,10,el.querySelector('#cL'));ta.addEventListener('input',()=>ok.disabled=!ta.value.trim());
-  ok.onclick=()=>{s.letters.push({id:uid(),from:'me',text:ta.value.trim(),t:Date.now(),thanked:false});S.tutorial=2;save();closeSheet();toast('水をあげました');setTimeout(grannyThanks,1600)}})}
+  ok.onclick=()=>{s.letters.push({id:uid(),from:'me',text:ta.value.trim(),t:Date.now(),thanked:false});S.tutorial=2;save();saveUser({tutorial:2,grannyLetter:ta.value.trim()});closeSheet();toast('水をあげました');setTimeout(grannyThanks,1600)}})}
 function openGranny(){target=null;const tu=S.tutorial||0;
- if(tu===0)return talkSheet(({play,button})=>play(TUT.intro,()=>button('おばあちゃんの種を見にいく',()=>{S.tutorial=1;S.metGranny=true;save();closeSheet();walkToGrannySeed()})));
+ if(tu===0)return talkSheet(({play,button})=>play(TUT.intro,()=>button('おばあちゃんの種を見にいく',()=>{S.tutorial=1;S.metGranny=true;save();saveUser({tutorial:1,metGranny:true});closeSheet();walkToGrannySeed()})));
  if(tu===1)return talkSheet(({play,button})=>play(TUT.remind,()=>button('おばあちゃんの種を見にいく',()=>{closeSheet();walkToGrannySeed()})));
  if(tu===2)return talkSheet(({play,button})=>play(TUT.finish,()=>button('はじめる',finishTutorial)));
  talkSheet(({say,you,play,ctl,scroll})=>{
@@ -489,9 +491,9 @@ function openHelp(){openSheet(`<div class="help"><div class="kicker">この世�
  <p>焚き火のそばのおばあちゃんに話しかけると、この世界のことや、種の蒔き方・水やりのこつを教えてくれます。</p>
  <p class="note">砂漠をタップすると歩けます（パソコンでは矢印キーでも）。右上の ☾ で昼と夜を切り替えられます（ふだんは時刻に合わせて変わります）。<br>【試作版】データはこのブラウザの中だけに保存されます。架空の村人の種がいくつか置いてあり、あなたの種にも、しばらくすると架空の村人から手紙が届きます。</p>
  <div class="row"><button class="btn ghost small" id="rst">データを消す</button><button class="btn main small" id="x">歩きはじめる</button></div></div>`,el=>{
-  el.querySelector('#x').onclick=()=>{const first=(S.tutorial||0)<1;S.introSeen=true;save();closeSheet();if(first)setTimeout(()=>toast('焚き火のそばのおばあちゃんに、話しかけてみよう'),500)};
-  const r=el.querySelector('#rst');r.onclick=()=>{if(r.dataset.c){try{localStorage.removeItem(KEY)}catch(e){}S={seeds:[],init:false,introSeen:true};load();ensureGranny();S.introSeen=true;save();rebuildWorld();P.x=VC.x+30;P.y=VC.y+85;closeSheet();toast('世界をはじめの姿に戻しました')}else{r.dataset.c=1;r.textContent='本当に消す'}}})}
-$('#btnHelp').onclick=openHelp;
+  el.querySelector('#x').onclick=()=>{const first=(S.tutorial||0)<1;S.introSeen=true;save();saveUser({introSeen:true});closeSheet();if(first)setTimeout(()=>toast('焚き火のそばのおばあちゃんに、話しかけてみよう'),500)};
+  const r=el.querySelector('#rst');r.onclick=()=>{if(r.dataset.c){try{localStorage.removeItem(KEY)}catch(e){}S={seeds:[],init:false,introSeen:true};load();ensureGranny();S.introSeen=true;save();saveUser({tutorial:0,metGranny:false,introSeen:true,grannyLetter:null});rebuildWorld();P.x=VC.x+30;P.y=VC.y+85;closeSheet();toast('世界をはじめの姿に戻しました')}else{r.dataset.c=1;r.textContent='本当に消す'}}})}
+$('#btnHelp').onclick=()=>{if(ready)openHelp()};
 
 /* ---------- demo villagers ---------- */
 function tickDemo(){const now=Date.now();let ch=false;
@@ -505,5 +507,11 @@ setInterval(tickDemo,2000);
 let last=performance.now();
 function frame(ts){const dt=Math.min(.05,(ts-last)/1000);last=ts;update(dt,ts);draw(ts);requestAnimationFrame(frame)}
 requestAnimationFrame(frame);refreshDot();
-if(!S.introSeen)setTimeout(openHelp,400);
+
+/* ---------- user (Firestore) ---------- */
+// 講習の進み具合・説明を見たか・おばあちゃんへの手紙は users/{uid} を正とする
+function applyUser(u){if(!u)return;S.tutorial=u.tutorial||0;S.metGranny=!!u.metGranny;S.introSeen=!!u.introSeen;
+ const g=grannySeed();if(g)g.letters=u.grannyLetter?[{id:'granny-letter',from:'me',text:u.grannyLetter,t:Date.now(),thanked:S.tutorial>=2}]:[];
+ save();rebuildWorld()}
+initUser().then(applyUser).catch(e=>console.error('[initUser]',e)).finally(()=>{ready=true;refreshDot();if(!S.introSeen)setTimeout(openHelp,400)});
 })();

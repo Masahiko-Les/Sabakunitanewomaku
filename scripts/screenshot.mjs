@@ -29,7 +29,9 @@ async function shoot(url, prefix, useLocalStorage) {
     });
   }
 
-  await page.goto(url, { waitUntil: 'networkidle' });
+  await page.goto(url, { waitUntil: 'load' });
+  // Firebase 版は匿名ログイン後に説明シートが開くので、開くまで少し待つ
+  await page.locator('#sheet.on').waitFor({ timeout: 5000 }).catch(() => {});
   await page.waitForTimeout(1500);
 
   // Close any open sheet (auto-shown help sheet)

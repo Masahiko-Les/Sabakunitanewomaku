@@ -3,3 +3,7 @@ dist/
 .env
 .env.local
 screenshots/
+
+# Firebase
+.firebase/
+*-debug.log
