@@ -80,9 +80,10 @@ check((await page.textContent('#sheetBody')).includes(H1), 'localStorage を消�
 await page.screenshot({ path: `${OUT}/p3_2_mine_after_reload.png` });
 await page.evaluate(() => document.querySelector('.scrim').click()); await page.waitForTimeout(400);
 
-// 同じマスにはもう蒔けない（ボタン表示）
+// 蒔いた種のマスをタップすると、その種のシートが開く（種のマスには立てない＝同じマスには蒔けない）
 await page.mouse.click(237, 453); await page.waitForTimeout(2500);
-check((await label()).includes('このマスには種があります'), `同じマスには蒔けない（${await label()}）`);
+check((await page.textContent('#sheetBody')).includes(H1) && (await page.textContent('#sheetBody')).includes('あなたの種'),
+  '蒔いた種のマスをタップすると「あなたの種」が開く');
 
 // 危機的な言葉 → hidden で保存、相談先シート
 await page.reload({ waitUntil: 'load' }); await boot();

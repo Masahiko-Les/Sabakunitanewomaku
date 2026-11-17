@@ -2,8 +2,8 @@ import './style.css';
 import { enabled as FB, initUser, saveUser, loadMyWorld, plantSeed, findDeliverable, receiveSeed,
   getUid, watchLetters, watchMyLetter, writeLetter, thankLetter } from './firebase.js';
 
-// 見本の種 8 つを置くか（未決事項。決まるまでは試作版と同じく置く）
-const USE_SAMPLES = import.meta.env.VITE_USE_SAMPLES !== 'false';
+// 見本の種 8 つを置くか。公開版では置かない（最初は種も花もない）。VITE_USE_SAMPLES=true で試作版と同じく置く
+const USE_SAMPLES = import.meta.env.VITE_USE_SAMPLES === 'true';
 // 1 日に受け取る種の数の上限
 const DAILY_RECEIVE = 3;
 // 配達を見にいく間隔（アプリを開いている間）
