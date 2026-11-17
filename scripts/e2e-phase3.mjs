@@ -20,6 +20,9 @@ const getDocJSON = async path => { const r = await fetch(`${FS}/${path}`, { head
 const listDocs = async path => { const r = await (await fetch(`${FS}/${path}`, { headers: OWNER })).json();
   return (r.documents || []).map(d => ({ id: d.name.split('/').pop(), ...plain(d) })); };
 
+// まっさらな Emulator から始める（ほかのテストの種が配達されてこないように）
+await fetch('http://127.0.0.1:8080/emulator/v1/projects/demo-sabaku/databases/(default)/documents', { method: 'DELETE' });
+
 let failed = false;
 const check = (c, m) => { console.log(c ? 'OK:' : 'NG:', m); if (!c) failed = true; };
 

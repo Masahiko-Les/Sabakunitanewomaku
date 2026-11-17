@@ -1,7 +1,6 @@
 rules_version = '2';
-// フェーズ3：users / seeds（読む・蒔く）/ worlds/{uid}/tiles（自分の種の配置）。
-// 配達（seeds の update と received のタイル）はフェーズ4、手紙はフェーズ5で追加し、
-// フェーズ6で Emulator テストとあわせて仕上げる。
+// フェーズ4：users / seeds（読む・蒔く・配達）/ worlds/{uid}/tiles（自分の種・届いた種の配置）。
+// 手紙はフェーズ5で追加し、フェーズ6で Emulator テストとあわせて仕上げる。
 service cloud.firestore {
   match /databases/{db}/documents {
     function signedIn() { return request.auth != null; }
@@ -20,8 +19,15 @@ service cloud.firestore {
         && request.resource.data.seedId == seedId
         && isTile(request.resource.data.x) && isTile(request.resource.data.y)
         && request.resource.data.placedAt == request.time
-        && request.resource.data.kind == 'own'
-        && getAfter(/databases/$(db)/documents/seeds/$(seedId)).data.ownerUid == uid;
+        && (
+          (request.resource.data.kind == 'own'
+            && getAfter(/databases/$(db)/documents/seeds/$(seedId)).data.ownerUid == uid)
+          ||
+          // 届いた種：配達（seeds の update）と同じトランザクションでだけ置ける
+          (request.resource.data.kind == 'received'
+            && !(uid in get(/databases/$(db)/documents/seeds/$(seedId)).data.deliveredTo)
+            && uid in getAfter(/databases/$(db)/documents/seeds/$(seedId)).data.deliveredTo)
+        );
       allow update, delete: if false;
     }
 
@@ -43,7 +49,20 @@ service cloud.firestore {
         // 種は、自分の世界のタイルと同時にしか蒔けない
         && existsAfter(/databases/$(db)/documents/worlds/$(me())/tiles/$(seedId));
 
-      allow update, delete: if false;
+      // 配達：ほかの人が、自分の分の枠を 1 つ受け取る（自分の世界のタイルと同時に）
+      allow update: if signedIn()
+        && resource.data.ownerUid != me()
+        && resource.data.status == 'public'
+        && resource.data.open == true
+        && resource.data.deliveredCount < 5
+        && !(me() in resource.data.deliveredTo)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deliveredCount','deliveredTo','open'])
+        && request.resource.data.deliveredCount == resource.data.deliveredCount + 1
+        && request.resource.data.deliveredTo == resource.data.deliveredTo.concat([me()])
+        && request.resource.data.open == (request.resource.data.deliveredCount < 5)
+        && existsAfter(/databases/$(db)/documents/worlds/$(me())/tiles/$(seedId));
+
+      allow delete: if false;
     }
   }
 }

@@ -1,8 +1,12 @@
 import './style.css';
-import { initUser, saveUser, loadMyWorld, plantSeed } from './firebase.js';
+import { enabled as FB, initUser, saveUser, loadMyWorld, plantSeed, findDeliverable, receiveSeed } from './firebase.js';
 
 // 見本の種 8 つを置くか（未決事項。決まるまでは試作版と同じく置く）
 const USE_SAMPLES = import.meta.env.VITE_USE_SAMPLES !== 'false';
+// 1 日に受け取る種の数の上限
+const DAILY_RECEIVE = 3;
+// 配達を見にいく間隔（アプリを開いている間）
+const DELIVERY_INTERVAL = 5 * 60 * 1000;
 
 (()=>{
 const TILE=48, N=100, WORLD=TILE*N, STORM_GAP=10;
@@ -67,7 +71,7 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function load(){try{localStorage.removeItem('sabaku-ni-tane-v1');localStorage.removeItem('sabaku-ni-tane-v2');const r=localStorage.getItem(KEY);if(r)S=JSON.parse(r)}catch(e){}
  if(!S.init){S.seeds=sampleSeeds();S.init=true;save()}}
-function sampleSeeds(){return USE_SAMPLES?SAMPLES.map(([dx,dy,h,f,bloom,sprout],i)=>({id:'s'+i,x:50+dx,y:50+dy,mine:false,h,f,t:Date.now()-86400000*(i+1),flower:i%5,letters:[],bloom,sprout})):[]}
+function sampleSeeds(){return USE_SAMPLES?SAMPLES.map(([dx,dy,h,f,bloom,sprout],i)=>({id:'s'+i,x:50+dx,y:50+dy,mine:false,h,f,t:Date.now()-86400000*(i+1),flower:i%5,letters:[],bloom,sprout,sample:true})):[]}
 load();
 const thanksOf=s=>(s.bloom||0)+s.letters.filter(l=>l.thanked).length;
 const stageOf=s=>thanksOf(s)>0?'flower':(s.letters.length||s.sprout)?'sprout':'seed';
@@ -354,7 +358,8 @@ function openSeed(s){if(s.mine)return openMine(s);if(s.granny)return openGrannyS
  if(s.unread){s.unread=false;save()}
  openSheet(body,el=>{el.querySelector('#x').onclick=closeSheet;const ta=el.querySelector('#tL');if(!ta)return;
   const ok=el.querySelector('#ok');lineLimit(ta,10,el.querySelector('#cL'));ta.addEventListener('input',()=>ok.disabled=!ta.value.trim());
-  ok.onclick=()=>{s.letters.push({id:uid(),from:'me',text:ta.value.trim(),t:Date.now(),thanked:false});save();closeSheet();toast('水をあげました')}})}
+  ok.onclick=()=>{const l={id:uid(),from:'me',text:ta.value.trim(),t:Date.now(),thanked:false};s.letters.push(l);save();
+   if(s.sample)saveUser({['sampleLetters.'+s.id]:{text:l.text,t:l.t,thanked:false}});closeSheet();toast('水をあげました')}})}
 
 function openMine(s){
  const self=s.letters.find(l=>l.from==='me');
@@ -503,6 +508,9 @@ requestAnimationFrame(frame);refreshDot();
 /* ---------- user (Firestore) ---------- */
 // 講習の進み具合・説明を見たか・おばあちゃんへの手紙は users/{uid} を正とする
 function applyUser(u){if(!u)return;S.tutorial=u.tutorial||0;S.metGranny=!!u.metGranny;S.introSeen=!!u.introSeen;
+ U.receivedToday=u.receivedToday||0;U.receivedDate=u.receivedDate||'';
+ for(const s of S.seeds){if(!s.sample)continue;const l=(u.sampleLetters||{})[s.id];
+  if(l)s.letters=[{id:'sample-letter',from:'me',text:l.text,t:l.t,thanked:!!l.thanked}];else s.letters=[]}
  const g=grannySeed();if(g)g.letters=u.grannyLetter?[{id:'granny-letter',from:'me',text:u.grannyLetter,t:Date.now(),thanked:S.tutorial>=2}]:[];
  save();rebuildWorld()}
 // 自分の世界の種は worlds/{uid}/tiles と seeds を正とする。
@@ -512,5 +520,41 @@ function applyWorld(list){if(!list)return;const prev=new Map(S.seeds.map(s=>[s.i
  const fromFs=({tile,seed})=>({id:seed.id,x:tile.x,y:tile.y,mine:tile.kind==='own',h:seed.h,f:seed.f,
   t:seed.createdAt?.toMillis?.()||Date.now(),flower:seed.flower||0,letters:[],hidden:seed.status==='hidden'});
  const g=grannySeed();S.seeds=[...sampleSeeds().map(keep),...(g?[g]:[]),...list.map(fromFs).map(keep)];save();rebuildWorld()}
-initUser().then(async u=>{if(u)applyWorld(await loadMyWorld());applyUser(u)}).catch(e=>console.error('[initUser]',e)).finally(()=>{ready=true;refreshDot();if(!S.introSeen)setTimeout(openHelp,400)});
+const U={receivedToday:0,receivedDate:''};
+const dayKey=ms=>{const d=new Date(ms);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
+
+/* ---------- samples: 見本の種への手紙は、どこにも届かず、翌日にありがとうが返って花が咲く ---------- */
+function sampleThanks(){const t=dayKey(Date.now());let ch=false;
+ for(const s of S.seeds){if(!s.sample)continue;const l=myLetter(s);
+  if(l&&!l.thanked&&dayKey(l.t)<t){l.thanked=true;l.thankedAt=Date.now();s.unread=true;ch=true;bloom(s);
+   saveUser({['sampleLetters.'+s.id+'.thanked']:true})}}
+ if(ch){save();refreshDot()}}
+
+/* ---------- delivery: まだ 5 つの世界に届いていない種を、自分の世界に受け取る ---------- */
+function freeGreenTiles(){const out=[];
+ for(let y=0;y<N;y++)for(let x=0;x<N;x++){if(green[y*N+x]<.5||inVillage(x,y)||decor[y*N+x]||seedOn(x,y))continue;out.push([x,y])}
+ return out}
+// ほかの人と同時に受け取ろうとすると、ルールで弾かれる（先に書いた人がいる）ので、少し待って読み直す
+async function receiveWithRetry(id,x,y,t){
+ for(let i=0;i<6;i++){try{return await receiveSeed(id,x,y,t,DAILY_RECEIVE)}
+  catch(e){if(!['permission-denied','aborted','failed-precondition'].includes(e.code)||i===5){console.error('[receiveSeed]',e);return null}
+   await new Promise(r=>setTimeout(r,150+Math.random()*350*(i+1)))}}
+ return null}
+let delivering=false;
+async function receiveSeeds(){if(!FB||delivering||!ready)return;delivering=true;
+ try{const t=dayKey(Date.now());let n=U.receivedDate===t?U.receivedToday:0;if(n>=DAILY_RECEIVE)return;
+  // ほかの人に先を越されることもあるので、候補は多めに取り、足りなければ探しなおす
+  for(let round=0;round<3&&n<DAILY_RECEIVE;round++){
+  const ids=await findDeliverable(new Set(S.seeds.map(s=>s.id)),(DAILY_RECEIVE-n)*4).catch(e=>{console.error('[findDeliverable]',e);return[]});if(!ids.length)break;
+  for(const id of ids){if(n>=DAILY_RECEIVE)break;
+   const free=freeGreenTiles();if(!free.length)break; // 空いている緑のマスがなければ、次の機会に回す
+   const[x,y]=free[Math.floor(Math.random()*free.length)];
+   const r=await receiveWithRetry(id,x,y,t);
+   if(!r)continue;n=r.count;U.receivedToday=n;U.receivedDate=t;
+   if(seedOn(x,y))continue;
+   S.seeds.push({id,x,y,mine:false,h:r.seed.h,f:r.seed.f,t:r.seed.createdAt?.toMillis?.()||Date.now(),flower:r.seed.flower||0,letters:[]});save()}}}
+ finally{delivering=false}}
+
+initUser().then(async u=>{if(u)applyWorld(await loadMyWorld());applyUser(u)}).catch(e=>console.error('[initUser]',e)).finally(()=>{ready=true;sampleThanks();refreshDot();if(!S.introSeen)setTimeout(openHelp,400);
+ receiveSeeds();setInterval(receiveSeeds,DELIVERY_INTERVAL);setInterval(sampleThanks,60*1000)});
 })();
