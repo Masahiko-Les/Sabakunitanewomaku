@@ -498,10 +498,9 @@ function openHelp(){openSheet(`<div class="help"><div class="kicker">この世�
  <p>種には、抱えている生きづらさと、それにどう向き合っているかを書きます。誰かの種を見つけたら、優しい言葉の手紙で水をあげてください。手紙は蒔いた人にだけ届き、名前はどこにも表示されません。</p>
  <p>蒔いた人が「ありがとう」を返すと花が咲き、まわり8マスの砂が緑に変わります。そこにまた種が蒔けるようになります。緑が広がるほど嵐はやわらぎ、世界は少しずつ先へひらけていきます。</p>
  <p>焚き火のそばのおばあちゃんに話しかけると、この世界のことや、種の蒔き方・水やりのこつを教えてくれます。</p>
- <p class="note">砂漠をタップすると歩けます（パソコンでは矢印キーでも）。右上の ☾ で昼と夜を切り替えられます（ふだんは時刻に合わせて変わります）。<br>【試作版】データはこのブラウザの中だけに保存されます。架空の村人の種がいくつか置いてあります。</p>
- <div class="row"><button class="btn ghost small" id="rst">データを消す</button><button class="btn main small" id="x">歩きはじめる</button></div></div>`,el=>{
-  el.querySelector('#x').onclick=()=>{const first=(S.tutorial||0)<1;S.introSeen=true;save();saveUser({introSeen:true});closeSheet();if(first)setTimeout(()=>toast('焚き火のそばのおばあちゃんに、話しかけてみよう'),500)};
-  const r=el.querySelector('#rst');r.onclick=()=>{if(r.dataset.c){try{localStorage.removeItem(KEY)}catch(e){}S={seeds:[],init:false,introSeen:true};load();ensureGranny();S.introSeen=true;save();saveUser({tutorial:0,metGranny:false,introSeen:true,grannyLetter:null});rebuildWorld();P.x=VC.x+30;P.y=VC.y+85;closeSheet();toast('世界をはじめの姿に戻しました')}else{r.dataset.c=1;r.textContent='本当に消す'}}})}
+ <p class="note">砂漠をタップすると歩けます（パソコンでは矢印キーでも）。右上の ☾ で昼と夜を切り替えられます（ふだんは時刻に合わせて変わります）。</p>
+ <div class="row"><button class="btn main small" id="x">歩きはじめる</button></div></div>`,el=>{
+  el.querySelector('#x').onclick=()=>{const first=(S.tutorial||0)<1;S.introSeen=true;save();saveUser({introSeen:true});closeSheet();if(first)setTimeout(()=>toast('焚き火のそばのおばあちゃんに、話しかけてみよう'),500)}})}
 $('#btnHelp').onclick=()=>{if(ready)openHelp()};
 
 /* ---------- loop ---------- */
