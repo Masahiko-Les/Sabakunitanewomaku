@@ -134,7 +134,10 @@ export function receiveSeed(seedId, x, y, today, dailyMax) {
   if (!myUid) return Promise.resolve(null);
   const sref = doc(db, 'seeds', seedId);
   return runTransaction(db, async tx => {
-    const ss = await tx.get(sref), us = await tx.get(userRef);
+    // 締め切られた種は、届いていない人には読めない（ルール）。その種はもう受け取れないので、やり直さずにあきらめる
+    let ss;
+    try { ss = await tx.get(sref); } catch (e) { if (e.code === 'permission-denied') return null; throw e; }
+    const us = await tx.get(userRef);
     if (!ss.exists() || !us.exists()) return null;
     const s = ss.data(), u = us.data();
     const to = s.deliveredTo || [];

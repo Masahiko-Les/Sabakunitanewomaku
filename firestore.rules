@@ -1,15 +1,69 @@
 rules_version = '2';
-// フェーズ5：users / seeds（読む・蒔く・配達）/ worlds/{uid}/tiles（自分の種・届いた種の配置）
-//            / seeds/{id}/letters/{書いた人の uid}（手紙とありがとう）。
-// フェーズ6で Emulator テストとあわせて仕上げる。
+// users / seeds（読む・蒔く・配達）/ worlds/{uid}/tiles（自分の種・届いた種の配置）
+// / seeds/{id}/letters/{書いた人の uid}（手紙とありがとう）。
+// テスト：npm run test:rules（Emulator で scripts/rules-*.mjs をすべて実行する）
 service cloud.firestore {
   match /databases/{db}/documents {
     function signedIn() { return request.auth != null; }
     function me() { return request.auth.uid; }
     function isTile(v) { return v is int && v >= 0 && v < 100; }
 
+    // ---------- users ----------
+    // 'YYYY-MM-DD'（端末の日付）。未来の日付で上限をすり抜けないよう、サーバーの時刻＋1 日までに限る
+    function okDate(d) {
+      return d is string && (d == ''
+        || (d.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+            && timestamp.date(int(d[0:4]), int(d[5:7]), int(d[8:10])) <= request.time + duration.value(1, 'd')));
+    }
+    // 見本の種への手紙（s0〜s7）。どこにも送られない
+    function okSample(m, k) {
+      return !(k in m) || (m[k] is map && m[k].keys().hasOnly(['text','t','thanked'])
+        && m[k].text is string && m[k].text.size() > 0 && m[k].text.size() <= 300
+        && m[k].t is number && m[k].thanked is bool);
+    }
+    function okSamples(m) {
+      return m is map && m.keys().hasOnly(['s0','s1','s2','s3','s4','s5','s6','s7'])
+        && okSample(m,'s0') && okSample(m,'s1') && okSample(m,'s2') && okSample(m,'s3')
+        && okSample(m,'s4') && okSample(m,'s5') && okSample(m,'s6') && okSample(m,'s7');
+    }
+    function okUser(d) {
+      return d.keys().hasOnly(['createdAt','tutorial','metGranny','introSeen','grannyLetter',
+                               'receivedToday','receivedDate','seen','sampleLetters'])
+        && d.get('tutorial', 0) is int && d.get('tutorial', 0) >= 0 && d.get('tutorial', 0) <= 3
+        && d.get('metGranny', false) is bool
+        && d.get('introSeen', false) is bool
+        && (d.get('grannyLetter', null) == null
+            || (d.grannyLetter is string && d.grannyLetter.size() <= 300))
+        && d.get('receivedToday', 0) is int && d.get('receivedToday', 0) >= 0 && d.get('receivedToday', 0) <= 3
+        && okDate(d.get('receivedDate', ''))
+        && (d.get('seen', {}) is map && d.get('seen', {}).size() <= 2000)
+        && okSamples(d.get('sampleLetters', {}));
+    }
+    // 1 日の受け取り数は、同じ日のうちは減らせない。日付は進めることしかできず、進めたら 1 から数え直す
+    function okCount(o, n) {
+      return (n.get('receivedDate', '') == o.get('receivedDate', '')
+              && n.get('receivedToday', 0) >= o.get('receivedToday', 0))
+        || (n.get('receivedDate', '') > o.get('receivedDate', '') && n.get('receivedToday', 0) <= 1);
+    }
+    // 配達 1 回で、ちょうど 1 つ数える（1 日 3 つまで）
+    function countedOne(o, n) {
+      return n.get('receivedToday', 0) <= 3
+        && ((n.get('receivedDate', '') == o.get('receivedDate', '')
+             && n.get('receivedToday', 0) == o.get('receivedToday', 0) + 1)
+            || (n.get('receivedDate', '') > o.get('receivedDate', '') && n.get('receivedToday', 0) == 1));
+    }
+
     match /users/{uid} {
-      allow read, create, update: if signedIn() && me() == uid;
+      allow read: if signedIn() && me() == uid;
+      allow create: if signedIn() && me() == uid
+        && okUser(request.resource.data)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.get('receivedToday', 0) == 0
+        && request.resource.data.get('receivedDate', '') == '';
+      allow update: if signedIn() && me() == uid
+        && okUser(request.resource.data)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['createdAt'])
+        && okCount(resource.data, request.resource.data);
       allow delete: if false;
     }
 
@@ -33,8 +87,11 @@ service cloud.firestore {
     }
 
     match /seeds/{seedId} {
+      // 読めるのは、蒔いた人と、まだ届け先を探している公開中の種（配達のため）と、自分に届いた公開中の種だけ
       allow read: if signedIn()
-        && (resource.data.status == 'public' || resource.data.ownerUid == me());
+        && (resource.data.ownerUid == me()
+            || (resource.data.status == 'public'
+                && (resource.data.open == true || me() in resource.data.deliveredTo)));
 
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly(['ownerUid','h','f','flower','createdAt','status','open','deliveredCount','deliveredTo'])
@@ -61,7 +118,10 @@ service cloud.firestore {
         && request.resource.data.deliveredCount == resource.data.deliveredCount + 1
         && request.resource.data.deliveredTo == resource.data.deliveredTo.concat([me()])
         && request.resource.data.open == (request.resource.data.deliveredCount < 5)
-        && existsAfter(/databases/$(db)/documents/worlds/$(me())/tiles/$(seedId));
+        && existsAfter(/databases/$(db)/documents/worlds/$(me())/tiles/$(seedId))
+        // 同じトランザクションで、自分の 1 日の受け取り数を 1 つ数える
+        && countedOne(get(/databases/$(db)/documents/users/$(me())).data,
+                      getAfter(/databases/$(db)/documents/users/$(me())).data);
 
       allow delete: if false;
 

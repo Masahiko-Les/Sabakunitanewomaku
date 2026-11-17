@@ -1,38 +1,10 @@
-// フェーズ5のルール確認（手紙とありがとう）。前提：npm run emulators が動いていること
-import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, connectAuthEmulator } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator, doc, collection, getDoc, getDocs, setDoc, updateDoc, deleteDoc,
-  writeBatch, runTransaction, serverTimestamp } from 'firebase/firestore';
+// ルール確認：手紙とありがとう。前提：Emulator が動いていること（npm run test:rules）
+import { doc, collection, getDoc, getDocs, setDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { client, plant, deliver, adminPatch, expect, done } from './rules-lib.mjs';
 
-async function client(name) {
-  const app = initializeApp({ apiKey: 'demo-key', projectId: 'demo-sabaku' }, name);
-  const auth = getAuth(app); connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
-  const db = getFirestore(app); connectFirestoreEmulator(db, '127.0.0.1', 8080);
-  return { db, uid: (await signInAnonymously(auth)).user.uid };
-}
 const [A, B, C, D] = await Promise.all(['A', 'B', 'C', 'D'].map(client));
-
-async function plant(c) {
-  const ref = doc(collection(c.db, 'seeds')), b = writeBatch(c.db);
-  b.set(ref, { ownerUid: c.uid, h: 'つらい', f: '向き合っている', flower: 1, createdAt: serverTimestamp(),
-    status: 'public', open: true, deliveredCount: 0, deliveredTo: [] });
-  b.set(doc(c.db, 'worlds', c.uid, 'tiles', ref.id), { seedId: ref.id, x: 51, y: 53, kind: 'own', placedAt: serverTimestamp() });
-  await b.commit();
-  return ref.id;
-}
-const deliver = (c, id) => runTransaction(c.db, async tx => {
-  const s = (await tx.get(doc(c.db, 'seeds', id))).data(), n = s.deliveredCount + 1;
-  tx.update(doc(c.db, 'seeds', id), { deliveredCount: n, deliveredTo: [...s.deliveredTo, c.uid], open: n < 5 });
-  tx.set(doc(c.db, 'worlds', c.uid, 'tiles', id), { seedId: id, x: 52, y: 53, kind: 'received', placedAt: serverTimestamp() });
-});
 const L = (c, id, writer = c.uid) => doc(c.db, 'seeds', id, 'letters', writer);
 const letter = (c, o = {}) => ({ writerUid: c.uid, text: 'すてきですね', createdAt: serverTimestamp(), thanked: false, thankedAt: null, ...o });
-
-let failed = false;
-async function expect(ok, label, fn) {
-  let got; try { await fn(); got = true; } catch (e) { got = false; if (e.code !== 'permission-denied') console.log('  ', e.code, e.message); }
-  console.log(got === ok ? 'OK:' : 'NG:', `${ok ? '許可' : '拒否'}されるべき：${label}`); if (got !== ok) failed = true;
-}
 
 const S = await plant(A);
 await deliver(B, S); await deliver(D, S);
@@ -68,10 +40,9 @@ await expect(false, 'ありがとうを取り消す', () => updateDoc(L(A, S, B.
 await expect(false, 'ありがとうをもう一度返す（時刻の書き換え）', () => updateDoc(L(A, S, B.uid), { thanked: true, thankedAt: serverTimestamp() }));
 
 // 管理者が hidden にした種には、もう書けない（タイルがあっても）
-await fetch(`http://127.0.0.1:8080/v1/projects/demo-sabaku/databases/(default)/documents/seeds/${S}?updateMask.fieldPaths=status`, {
-  method: 'PATCH', headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' },
-  body: JSON.stringify({ fields: { status: { stringValue: 'hidden' } } }) });
+await adminPatch(`seeds/${S}`, { status: { stringValue: 'hidden' } });
 await expect(false, 'hidden になった種に手紙を書く（D）', () => setDoc(L(D, S), letter(D)));
 
-console.log(failed ? 'FAILED' : 'ALL PASSED');
-process.exit(failed ? 1 : 0);
+await expect(true, 'hidden になっても、蒔いた本人は自分の種の手紙を読める', () => getDocs(collection(A.db, 'seeds', S, 'letters')));
+
+done();
