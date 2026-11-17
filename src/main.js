@@ -351,7 +351,7 @@ $('#btnPlant').onclick=()=>{if(!ready)return;const pi=plantState();if(!pi.ok)ret
 const stageText={seed:'まだ、水を待っています',sprout:'芽が出ています',flower:'花が咲いています'};
 function openSeed(s){if(s.mine)return openMine(s);if(s.granny)return openGrannySeed(s);
  const mine=myLetter(s);
- let body=`<div class="kicker">誰かの種</div><p class="hard">${esc(s.h)}</p><p class="face">${esc(s.f)}</p><p class="state">${stageText[stageOf(s)]}</p>`;
+ let body=`<div class="kicker">誰かの種</div><p class="slabel">生きづらさ：</p><p class="hard">${esc(s.h)}</p><p class="slabel">それにどう向き合っているか：</p><p class="face">${esc(s.f)}</p><p class="state">${stageText[stageOf(s)]}</p>`;
  if(!mine&&(S.tutorial||0)<3){body+=`<p class="note">水やりは、焚き火のそばのおばあちゃんに教わってからにしよう。</p><div class="row"><button class="btn soft small" id="x">閉じる</button></div>`}
  else if(!mine){body+=`<label>優しい言葉の手紙で、水をあげる（10行まで）</label><textarea id="tL" rows="5" maxlength="300" placeholder="アドバイスより、まずは受けとめる言葉を"></textarea><div class="count" id="cL"></div>
   <p class="note">手紙は、この種を蒔いた人にだけ届きます。ほかの人には見えません。</p>
@@ -369,7 +369,7 @@ function openMine(s){
  const self=s.letters.find(l=>l.from==='me');
  const letters=s.letters.map(l=>`<div class="letter"><div class="from">${l.from==='me'?'自分から自分への手紙':'誰かからの手紙'}</div><div class="txt">${esc(l.text)}</div>
   <div class="act">${l.thanked?'ありがとうを返しました':`<button class="btn main small" data-thx="${l.id}">ありがとう</button>`}</div></div>`).join('');
- const body=`<div class="kicker">あなたの種</div><p class="hard">${esc(s.h)}</p><p class="face">${esc(s.f)}</p>
+ const body=`<div class="kicker">あなたの種</div><p class="slabel">生きづらさ：</p><p class="hard">${esc(s.h)}</p><p class="slabel">それにどう向き合っているか：</p><p class="face">${esc(s.f)}</p>
  <p class="state">${s.hidden?'この種は、ほかの人には見えない場所に置いてあります':stageText[stageOf(s)]}</p>
  ${s.letters.length?`<div class="sec">届いた手紙</div>${letters}`:`<p class="empty">まだ手紙は届いていません。誰かが通りかかるのを、静かに待っています。</p>`}
  ${self?'':`<div id="selfWrap"><div class="row" style="justify-content:flex-start"><button class="btn ghost small" id="selfBtn" style="padding-left:0">自分に、手紙を書く</button></div></div>`}
@@ -473,7 +473,7 @@ function grannyThanks(){talkSheet(({play,button})=>play(TUT.reading,()=>button('
  closeSheet();if(g)bloom(g);
  setTimeout(()=>talkSheet(({play,button})=>play(TUT.finish,()=>button('はじめる',finishTutorial))),3200)})))}
 function openGrannySeed(s){const mine=myLetter(s),tu=S.tutorial||0;
- let body=`<div class="kicker">おばあちゃんの種</div><p class="hard">${esc(s.h)}</p><p class="face">${esc(s.f)}</p>`;
+ let body=`<div class="kicker">おばあちゃんの種</div><p class="slabel">生きづらさ：</p><p class="hard">${esc(s.h)}</p><p class="slabel">それにどう向き合っているか：</p><p class="face">${esc(s.f)}</p>`;
  if(!mine&&tu>=1){body+=`<div class="care" style="font-size:13.5px;line-height:1.95"><b style="font-weight:500">水やりのこつ</b><br>・まずは、気持ちを受けとめる<br>　（「それは、さみしいですね」）<br>・向き合い方の、よいところを伝える<br>　（「その考え方、すてきです」）<br>・アドバイスは、しなくて大丈夫</div>
   <label>やさしい言葉の手紙で、水をあげる（10行まで）</label><textarea id="tL" rows="5" maxlength="300" placeholder="たとえば：できることを数えるって、すてきですね。"></textarea><div class="count" id="cL"></div>
   <div class="row"><button class="btn ghost small" id="x">閉じる</button><button class="btn main small" id="ok" disabled>水をあげる</button></div>`}
