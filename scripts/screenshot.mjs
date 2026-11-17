@@ -1,0 +1,77 @@
+import { chromium } from '@playwright/test';
+import { mkdir } from 'fs/promises';
+import { resolve } from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+const __dir = dirname(fileURLToPath(import.meta.url));
+const W = 390, H = 780, DPR = 2;
+const OUT = resolve(__dir, '..', 'screenshots');
+await mkdir(OUT, { recursive: true });
+
+const browser = await chromium.launch();
+
+async function shoot(url, prefix, useLocalStorage) {
+  const ctx = await browser.newContext({
+    viewport: { width: W, height: H },
+    deviceScaleFactor: DPR,
+  });
+  const page = await ctx.newPage();
+
+  if (useLocalStorage) {
+    await page.addInitScript(() => {
+      const key = 'sabaku-ni-tane-v3';
+      try {
+        const s = JSON.parse(localStorage.getItem(key) || '{}');
+        s.introSeen = true;
+        localStorage.setItem(key, JSON.stringify(s));
+      } catch {}
+    });
+  }
+
+  await page.goto(url, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(1500);
+
+  // Close any open sheet (auto-shown help sheet)
+  const scrimVisible = await page.evaluate(() => document.querySelector('.scrim')?.classList.contains('on'));
+  if (scrimVisible) {
+    await page.evaluate(() => document.querySelector('.scrim')?.click());
+    await page.waitForTimeout(500);
+  }
+
+  // Day
+  await page.screenshot({ path: `${OUT}/${prefix}_day.png` });
+
+  // Night
+  await page.click('#btnSky');
+  await page.waitForTimeout(1800);
+  await page.screenshot({ path: `${OUT}/${prefix}_night.png` });
+
+  // Back to day
+  await page.click('#btnSky');
+  await page.waitForTimeout(500);
+
+  // Help sheet
+  await page.click('#btnHelp');
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: `${OUT}/${prefix}_help.png` });
+  await page.evaluate(() => document.querySelector('.scrim')?.click());
+  await page.waitForTimeout(400);
+
+  // Mine sheet
+  await page.click('#btnMine');
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: `${OUT}/${prefix}_mine.png` });
+  await page.evaluate(() => document.querySelector('.scrim')?.click());
+  await page.waitForTimeout(400);
+
+  await ctx.close();
+  console.log(`Done: ${prefix}_*.png`);
+}
+
+await shoot('http://localhost:5173', 'vite', true);
+
+const protoPath = 'file:///' + resolve(__dir, '..', 'prototype', 'index.html').replace(/\\/g, '/');
+await shoot(protoPath, 'proto', false);
+
+await browser.close();

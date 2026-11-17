@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>砂漠に種を蒔く</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="vignette" id="vig"></div>
+<header><h1>砂漠に種を蒔く</h1><div class="hbtns"><button class="iconbtn" id="btnSky" aria-label="昼と夜">☾</button><button class="iconbtn" id="btnHelp" aria-label="この砂漠について">?</button></div></header>
+<nav class="bar">
+  <button class="btn soft" id="btnMine">わたしの種<span class="dot" id="dot" style="display:none"></span></button>
+  <button class="btn main" id="btnPlant">ここに種を蒔く</button>
+</nav>
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet"><div class="grip"></div><div id="sheetBody"></div></div>
+<div class="toast" id="toast"></div>
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
