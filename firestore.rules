@@ -121,6 +121,8 @@ service cloud.firestore {
         && request.resource.data.deliveredCount == resource.data.deliveredCount + 1
         && request.resource.data.deliveredTo == resource.data.deliveredTo.concat([me()])
         && request.resource.data.open == (request.resource.data.deliveredCount < 5)
+        // 配達を受け付けるのは、蒔いてから 24 時間まで（届け先が 5 人に満たなくても、そこで終わり）
+        && request.time < resource.data.createdAt + duration.value(24, 'h')
         && existsAfter(/databases/$(db)/documents/worlds/$(me())/tiles/$(seedId))
         // 同じトランザクションで、自分の 1 日の受け取り数を 1 つ数える
         && countedOne(get(/databases/$(db)/documents/users/$(me())).data,
@@ -142,6 +144,8 @@ service cloud.firestore {
                   && exists(/databases/$(db)/documents/worlds/$(me())/tiles/$(seedId))))
           && request.resource.data.keys().hasOnly(['writerUid','text','createdAt','thanked','thankedAt'])
           && request.resource.data.writerUid == me()
+          // 種と芽は、蒔いてから 1 週間で消える。手紙を書けるのはそれまで
+          && request.time < seed().createdAt + duration.value(7, 'd')
           && request.resource.data.text is string
           && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 300
           && request.resource.data.createdAt == request.time
@@ -153,7 +157,9 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['thanked','thankedAt'])
           && resource.data.thanked == false
           && request.resource.data.thanked == true
-          && request.resource.data.thankedAt == request.time;
+          && request.resource.data.thankedAt == request.time
+          // ありがとうを返せるのも、蒔いてから 1 週間まで
+          && request.time < seed().createdAt + duration.value(7, 'd');
 
         allow delete: if false;
       }

@@ -6,6 +6,8 @@ import { enabled as FB, initUser, saveUser, loadMyWorld, plantSeed, findDelivera
 const USE_SAMPLES = import.meta.env.VITE_USE_SAMPLES === 'true';
 // 1 日に受け取る種の数の上限
 const DAILY_RECEIVE = 3;
+// 種と芽が消えるまで（蒔いてから）。花は消えない
+const SEED_LIFE = 7 * 24 * 60 * 60 * 1000;
 // 配達を見にいく間隔（アプリを開いている間）
 const DELIVERY_INTERVAL = 5 * 60 * 1000;
 
@@ -78,6 +80,9 @@ load();
 const thanksOf=s=>(s.bloom||0)+s.letters.filter(l=>l.thanked).length;
 const stageOf=s=>thanksOf(s)>0?'flower':(s.letters.length||s.sprout)?'sprout':'seed';
 const myLetter=s=>s.letters.find(l=>l.from==='me');
+// 種と芽は、蒔いてから 1 週間で消える（花は消えない）。手紙を読み込む前は、花かどうかわからないので見せない
+const expired=s=>!s.granny&&!s.sample&&Date.now()-s.t>SEED_LIFE;
+const shown=s=>!expired(s)||(s.loaded&&stageOf(s)==='flower');
 const hasNew=()=>S.seeds.some(s=>s.unread);
 const seedOn=(tx,ty)=>S.seeds.find(s=>s.x===tx&&s.y===ty);
 
@@ -135,7 +140,7 @@ cv.addEventListener('pointerdown',e=>{if(sheetOpen||!ready)return;
  const wx=e.clientX+cam.x,wy=e.clientY+cam.y;tapFx={x:wx,y:wy,t:performance.now()};
  if(Math.hypot(wx-GRAN.x,wy-GRAN.y+8)<26){if(Math.hypot(P.x-GRAN.x,P.y-GRAN.y)<120)openGranny();else{target={x:GRAN.x-6,y:GRAN.y+42};pendingOpen='granny'}return}
  if(Math.hypot(wx-FIRE.x,wy-FIRE.y+8)<26&&Math.hypot(P.x-FIRE.x,P.y-FIRE.y)<130){toast('焚き火が、静かに燃えている');return}
- const[tx,ty]=tileOf(wx,wy),s=seedOn(tx,ty);
+ const[tx,ty]=tileOf(wx,wy),s0=seedOn(tx,ty),s=s0&&shown(s0)?s0:null;
  if(s){const cx=(tx+.5)*TILE,cy=(ty+.5)*TILE;
   if(Math.hypot(P.x-cx,P.y+10-cy)<TILE*1.6){openSeed(s);target=null;pendingOpen=null}
   else{target={x:cx+(P.x<cx?-TILE:TILE),y:cy-10};pendingOpen=s.id}}
@@ -212,11 +217,21 @@ function drawSeed(s,t){const x=s.x*TILE+TILE/2,y=s.y*TILE+TILE/2,st=stageOf(s);
  else if(st==='sprout'){const sw=Math.sin(t/800+x)*1.2;ctx.strokeStyle='#6f9a5e';ctx.lineWidth=1.8;ctx.beginPath();ctx.moveTo(x,y+3);ctx.lineTo(x+sw,y-6);ctx.stroke();
   ctx.fillStyle='#86b874';ctx.beginPath();ctx.ellipse(x+sw-4,y-7,4.5,2.2,.5,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.ellipse(x+sw+4,y-8,4.5,2.2,-.5,0,Math.PI*2);ctx.fill()}
  else{const n=Math.min(OFFS.length,thanksOf(s));for(let i=0;i<n;i++)drawFlower(x+OFFS[i][0],y+OFFS[i][1],s.flower+i*2,bloomScale(s,i,n),t)}}
-function drawPlayer(t){const bob=moving?Math.sin(t/85)*1.4:0,x=P.x,y=P.y,f=P.face;
- ell(x,y+12,11,4,'rgba(120,80,40,.22)');
- ctx.fillStyle='#7d93ad';ctx.beginPath();ctx.moveTo(x-10,y+11);ctx.quadraticCurveTo(x-11,y-4+bob,x,y-8+bob);ctx.quadraticCurveTo(x+11,y-4+bob,x+10,y+11);ctx.closePath();ctx.fill();
- ctx.fillStyle='#e9a86a';ctx.beginPath();ctx.roundRect(x-7,y-6+bob,14,4,2);ctx.fill();
- ell(x,y-13+bob,7.5,7.5,'#5f7591');ell(x+f*1.6,y-12+bob,4.8,4.8,'#f4d6b6');ell(x+f*3,y-12.5+bob,.9,.9,'#4a3b2c')}
+function drawPlayer(t){const bob=moving?Math.sin(t/85)*1.4:0,k=moving?Math.sin(t/85):0,x=P.x,y=P.y,f=P.face,H='#5b4636',SK='#f4d6b6';
+ ell(x,y+12,10,3.6,'rgba(120,80,40,.22)');
+ ctx.fillStyle=SK;ctx.fillRect(x-3.6,y+4,2.2,6-Math.max(0,k)*1.6);ctx.fillRect(x+1.4,y+4,2.2,6-Math.max(0,-k)*1.6);
+ ell(x-2.5,y+10.4-Math.max(0,k)*1.6,2.5,1.5,'#8a5e3e');ell(x+2.5,y+10.4-Math.max(0,-k)*1.6,2.5,1.5,'#8a5e3e');
+ const sw=moving?Math.sin(t/85+1)*1.2:Math.sin(t/700)*.5;
+ ell(x-f*7.2+sw*.4,y-10+bob,2.6,4.8,H);
+ ctx.fillStyle='#7d93ad';ctx.beginPath();ctx.moveTo(x-9,y+6);ctx.quadraticCurveTo(x-6,y-1+bob,x-4.5,y-6+bob);ctx.lineTo(x+4.5,y-6+bob);ctx.quadraticCurveTo(x+6,y-1+bob,x+9,y+6);ctx.quadraticCurveTo(x,y+7.5,x-9,y+6);ctx.closePath();ctx.fill();
+ ctx.fillStyle='#e9a86a';ctx.beginPath();ctx.roundRect(x-5.2,y-3.2+bob,10.4,2.4,1.2);ctx.fill();
+ ell(x-6.6,y+.5+bob-k*.6,1.7,2.2,SK);ell(x+6.6,y+.5+bob+k*.6,1.7,2.2,SK);
+ ell(x-f*.8,y-13+bob,7,6.8,H);
+ ell(x+f*1.2,y-11.4+bob,5.4,5.4,SK);
+ ctx.fillStyle=H;ctx.beginPath();ctx.ellipse(x+f*.4,y-14+bob,7,4.6,0,Math.PI,Math.PI*2);ctx.fill();
+ for(let i=0;i<4;i++)ell(x+f*.4-5+i*3.4,y-14+bob,1.9,1.5,H);
+ ell(x-f*6,y-15.6+bob,1.9,1.4,'#e9a86a');
+ ell(x+f*3.2,y-11.2+bob,.9,1.1,'#4a3b2c');ell(x+f*4,y-9.2+bob,1.3,.8,'rgba(226,128,112,.5)')}
 function drawHouse(){const x=HOUSE.x,y=HOUSE.y;
  ell(x+6,y+4,54,11,'rgba(60,80,40,.22)');
  ctx.fillStyle='#efe0c4';ctx.fillRect(x-40,y-46,80,48);ctx.fillStyle='rgba(120,90,60,.10)';ctx.fillRect(x+18,y-46,22,48);
@@ -269,7 +284,7 @@ function draw(t){ctx.setTransform(dpr,0,0,dpr,0,0);ctx.globalCompositeOperation=
  const vis=(x,y)=>x>cam.x-80&&x<cam.x+vw+80&&y>cam.y-80&&y<cam.y+vh+120;
  const items=[];
  for(const d of decoList){const x=d.x*TILE+TILE/2,y=d.y*TILE+TILE/2;if(vis(x,y))items.push([y,()=>drawDecor(d)])}
- for(const s of S.seeds){const x=s.x*TILE+TILE/2,y=s.y*TILE+TILE/2;if(vis(x,y))items.push([y+4,()=>drawSeed(s,t)])}
+ for(const s of S.seeds){if(!shown(s))continue;const x=s.x*TILE+TILE/2,y=s.y*TILE+TILE/2;if(vis(x,y))items.push([y+4,()=>drawSeed(s,t)])}
  if(vis(HOUSE.x,HOUSE.y)){items.push([HOUSE.y,drawHouse]);items.push([FIRE.y,drawFireBase]);items.push([GRAN.y+8,()=>drawGranny(t)])}
  for(const tr of TREES)if(vis(tr.x,tr.y))items.push([tr.y,()=>drawTree(tr,t)]);
  for(const b of BUSHES)if(vis(b.x,b.y))items.push([b.y,()=>drawBush(b)]);
@@ -370,11 +385,11 @@ function openSeed(s){if(s.mine)return openMine(s);if(s.granny)return openGrannyS
 function openMine(s){
  const self=s.letters.find(l=>l.from==='me');
  const letters=s.letters.map(l=>`<div class="letter"><div class="from">${l.from==='me'?'自分から自分への手紙':'誰かからの手紙'}</div><div class="txt">${esc(l.text)}</div>
-  <div class="act">${l.thanked?'ありがとうを返しました':`<button class="btn main small" data-thx="${l.id}">ありがとう</button>`}</div></div>`).join('');
+  <div class="act">${l.thanked?'ありがとうを返しました':expired(s)?'':`<button class="btn main small" data-thx="${l.id}">ありがとう</button>`}</div></div>`).join('');
  const body=`<div class="kicker">あなたの種</div><p class="slabel">生きづらさ：</p><p class="hard">${esc(s.h)}</p><p class="slabel">それにどう向き合っているか：</p><p class="face">${esc(s.f)}</p>
  <p class="state">${s.hidden?'この種は、ほかの人には見えない場所に置いてあります':stageText[stageOf(s)]}</p>
  ${s.letters.length?`<div class="sec">届いた手紙</div>${letters}`:`<p class="empty">まだ手紙は届いていません。誰かが通りかかるのを、静かに待っています。</p>`}
- ${self?'':`<div id="selfWrap"><div class="row" style="justify-content:flex-start"><button class="btn ghost small" id="selfBtn" style="padding-left:0">自分に、手紙を書く</button></div></div>`}
+ ${self||expired(s)?'':`<div id="selfWrap"><div class="row" style="justify-content:flex-start"><button class="btn ghost small" id="selfBtn" style="padding-left:0">自分に、手紙を書く</button></div></div>`}
  <div class="row"><button class="btn soft small" id="x">閉じる</button></div>`;
  markSeen(s);
  openSheet(body,el=>{el.querySelector('#x').onclick=closeSheet;
@@ -389,7 +404,7 @@ function openMine(s){
 function goTo(s){const cx=(s.x+.5)*TILE,cy=(s.y+.5)*TILE;P.x=cx-TILE;P.y=cy-10;if(solid(P.x,P.y+10))P.x=cx+TILE;
  cam.x=clamp(P.x-vw/2,0,WORLD-vw);cam.y=clamp(P.y-vh*.45,0,WORLD-vh);prints.length=0;lastStep={x:P.x,y:P.y};target=null}
 $('#btnMine').onclick=()=>{if(!ready)return;
- const mine=S.seeds.filter(s=>s.mine).sort((a,b)=>b.t-a.t),wat=S.seeds.filter(s=>!s.mine&&myLetter(s));
+ const mine=S.seeds.filter(s=>s.mine&&shown(s)).sort((a,b)=>b.t-a.t),wat=S.seeds.filter(s=>!s.mine&&myLetter(s)&&shown(s));
  const item=s=>`<button class="list-item" data-go="${s.id}">${s.unread?'<span class="dot" style="margin:0 6px 0 0"></span>':''}${esc(s.h.split('\n')[0])}<div class="s">${s.hidden?'見えない場所に置いてあります':stageText[stageOf(s)]}${s.mine&&s.letters.length?` ・ 手紙 ${s.letters.length}通`:''}${!s.mine&&myLetter(s).thanked?' ・ ありがとうが返ってきました':''}</div></button>`;
  openSheet(`<div class="kicker">わたしの種</div>
  ${mine.length?mine.map(item).join(''):'<p class="empty">まだ種を蒔いていません。<br>村のまわりの緑で、気になったマスを選んで「ここに種を蒔く」を押してみてください。</p>'}
@@ -548,6 +563,7 @@ function applyUser(u){if(!u)return;S.tutorial=u.tutorial||0;S.metGranny=!!u.metG
 // 手紙・ありがとうは、このあと watchers が seeds/{id}/letters から読み込む。
 function applyWorld(list){if(!list)return;const prev=new Map(S.seeds.map(s=>[s.id,s]));
  const keep=s=>{const p=prev.get(s.id);return p?{...s,letters:p.letters||[],unread:!!p.unread}:s};
+ // 手紙を読み込むまでは、花かどうかわからない（片付けるのは読み込んでから）
  const fromFs=({tile,seed})=>({id:seed.id,x:tile.x,y:tile.y,mine:tile.kind==='own',h:seed.h,f:seed.f,
   t:seed.createdAt?.toMillis?.()||Date.now(),flower:seed.flower||0,letters:[],hidden:seed.status==='hidden'});
  const g=grannySeed();S.seeds=[...sampleSeeds().map(keep),...(g?[g]:[]),...list.map(fromFs)];save();rebuildWorld()}
@@ -593,17 +609,20 @@ function lastEvent(s){if(s.mine)return Math.max(0,...s.letters.filter(l=>l.from!
 function markSeen(s){if(s.unread){s.unread=false;save()}
  if(!FB||s.sample||s.granny)return;const e=lastEvent(s);if(e>(SEEN[s.id]||0)){SEEN[s.id]=e;saveUser({['seen.'+s.id]:e})}}
 const watchers=new Map();
-let rebuildT=0;function rebuildSoon(){clearTimeout(rebuildT);rebuildT=setTimeout(()=>{rebuildWorld();save();refreshDot()},60)}
+let rebuildT=0;function rebuildSoon(){clearTimeout(rebuildT);rebuildT=setTimeout(()=>{prune();rebuildWorld();save();refreshDot()},60)}
 function stopWatch(id){const f=watchers.get(id);if(f){f();watchers.delete(id)}}
+// 1 週間たって、花にならなかった種と芽を、自分の世界から片付ける（マスが空く）
+function prune(){const gone=S.seeds.filter(s=>expired(s)&&s.loaded&&stageOf(s)!=='flower');if(!gone.length)return false;
+ for(const s of gone)stopWatch(s.id);S.seeds=S.seeds.filter(s=>!gone.includes(s));save();rebuildWorld();refreshDot();return true}
 // 自分の種：届いた手紙をずっと見張る（蒔いた人だけが読める）
 function watchOwn(s){if(!FB||watchers.has(s.id))return;
- watchers.set(s.id,watchLetters(s.id,ls=>{const me=getUid();
+ watchers.set(s.id,watchLetters(s.id,ls=>{const me=getUid();s.loaded=true;
   s.letters=ls.sort((a,b)=>a.t-b.t).map(l=>({id:l.id,from:l.writerUid===me?'me':'other',text:l.text,t:l.t,thanked:l.thanked,thankedAt:l.thankedAt}));
   s.unread=lastEvent(s)>(SEEN[s.id]||0);rebuildSoon()}))}
 // 届いた種：自分が書いた手紙に、ありがとうが返ってくるまで見張る（返ったら取り消せないので、そこで終わり）
 function watchReceived(s){if(!FB||watchers.has(s.id))return;
- watchers.set(s.id,watchMyLetter(s.id,(l,first)=>{
-  if(!l){if(first)stopWatch(s.id);return}
+ watchers.set(s.id,watchMyLetter(s.id,(l,first)=>{s.loaded=true;
+  if(!l){if(first)stopWatch(s.id);rebuildSoon();return}
   const was=!!myLetter(s)?.thanked;
   s.letters=[{id:l.id,from:'me',text:l.text,t:l.t,thanked:l.thanked,thankedAt:l.thankedAt}];
   s.unread=lastEvent(s)>(SEEN[s.id]||0);
@@ -616,5 +635,5 @@ initUser().then(async u=>{if(u)applyWorld(await loadMyWorld());applyUser(u);star
  let wasReset=false;try{wasReset=!!sessionStorage.getItem(RESET_KEY);sessionStorage.removeItem(RESET_KEY)}catch(e){}
  if(wasReset){S.introSeen=true;save();saveUser({introSeen:true});setTimeout(()=>toast('世界をはじめの姿に戻しました'),400)}
  else if(!S.introSeen)setTimeout(openHelp,400);
- receiveSeeds();setInterval(receiveSeeds,DELIVERY_INTERVAL);setInterval(sampleThanks,60*1000)});
+ receiveSeeds();setInterval(receiveSeeds,DELIVERY_INTERVAL);setInterval(()=>{sampleThanks();prune()},60*1000)});
 })();

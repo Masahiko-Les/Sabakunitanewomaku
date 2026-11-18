@@ -26,6 +26,8 @@ const body = () => page.textContent('#sheetBody');
 const sheetOn = () => page.evaluate(() => document.querySelector('#sheet').classList.contains('on'));
 const openSettings = async () => { await page.click('#btnSet'); await page.waitForTimeout(500); };
 
+// ほかのテストの種が届くと、タップした場所に種があったりするので、Emulator のデータを空にしてから始める
+await fetch('http://127.0.0.1:8080/emulator/v1/projects/demo-sabaku/databases/(default)/documents', { method: 'DELETE' });
 await page.goto(URL, { waitUntil: 'load' });
 await page.locator('#sheet.on').waitFor({ timeout: 15000 });
 const uid = await uidOf();
@@ -81,8 +83,10 @@ await lp.close();
 await page.mouse.click(237, 453); await page.waitForTimeout(3500);
 await page.click('#btnPlant'); await page.fill('#tH', '消す前の種です。'); await page.fill('#tF', 'あとで消える世界に蒔いた。');
 await page.click('#ok'); await page.waitForTimeout(2000);
-const tiles = await list(`worlds/${uid}/tiles`);
-check(tiles.length === 1, '消す前：自分の世界に種が 1 つ');
+// ほかのテストの種が届いていることもあるので、自分の種（kind: own）だけを数える
+const tiles = [];
+for (const id of await list(`worlds/${uid}/tiles`)) if ((await getRaw(`worlds/${uid}/tiles/${id}`))?.fields?.kind?.stringValue === 'own') tiles.push(id);
+check(tiles.length === 1, '消す前：自分の世界に自分の種が 1 つ');
 const seedId = tiles[0];
 
 await openSettings();

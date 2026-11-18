@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, connectAuthEmulator, deleteUser, signOut } from 'firebase/auth';
 import { getFirestore, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, writeBatch, serverTimestamp, connectFirestoreEmulator,
-  query, where, orderBy, limit, startAfter, runTransaction, onSnapshot } from 'firebase/firestore';
+  query, where, orderBy, limit, startAfter, runTransaction, onSnapshot, Timestamp } from 'firebase/firestore';
 
 const env = import.meta.env;
 const config = {
@@ -100,8 +100,11 @@ export function plantSeed({ x, y, h, f, flower, hidden }) {
   return { id: ref.id, done };
 }
 
+// 配達を受け付けるのは、蒔いてから 24 時間まで（ルールと同じ）
+export const DELIVERY_WINDOW = 24 * 60 * 60 * 1000;
+
 /**
- * 配達：まだ届け先が 5 未満の公開中の種を、古い順に探す。
+ * 配達：まだ届け先が 5 未満の公開中の種を、古い順に探す（蒔いてから 24 時間以内のものだけ）。
  * 自分の種・すでに自分に届いている種・exclude にある種は除く。
  */
 export async function findDeliverable(exclude, want, pageSize = 20, maxPages = 5) {
@@ -110,7 +113,7 @@ export async function findDeliverable(exclude, want, pageSize = 20, maxPages = 5
   let cursor = null;
   for (let p = 0; p < maxPages && out.length < want; p++) {
     let q = query(collection(db, 'seeds'), where('status', '==', 'public'), where('open', '==', true),
-      orderBy('createdAt', 'asc'), limit(pageSize));
+      where('createdAt', '>', Timestamp.fromMillis(Date.now() - DELIVERY_WINDOW)), orderBy('createdAt', 'asc'), limit(pageSize));
     if (cursor) q = query(q, startAfter(cursor));
     const snap = await getDocs(q);
     for (const d of snap.docs) {
@@ -142,6 +145,7 @@ export function receiveSeed(seedId, x, y, today, dailyMax) {
     const s = ss.data(), u = us.data();
     const to = s.deliveredTo || [];
     if (s.status !== 'public' || !s.open || s.ownerUid === myUid || to.includes(myUid) || s.deliveredCount >= 5) return null;
+    if (!s.createdAt || Date.now() - s.createdAt.toMillis() >= DELIVERY_WINDOW) return null;
     const count = u.receivedDate === today ? (u.receivedToday || 0) : 0;
     if (count >= dailyMax) return null;
     const n = s.deliveredCount + 1;

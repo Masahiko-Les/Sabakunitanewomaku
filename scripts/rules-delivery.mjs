@@ -48,4 +48,13 @@ const ymd = ms => new Date(ms).toISOString().slice(0, 10);
 await adminPatch(`users/${B.uid}`, { receivedDate: { stringValue: ymd(Date.now() - 86400000) }, receivedToday: { integerValue: 3 } });
 await expect(true, '日付が変わったら、1 から数え直して受け取れる', () => deliver(B, more[2], { date: ymd(Date.now()) }));
 
+// 配達を受け付けるのは、蒔いてから 24 時間まで（届け先が 5 人に満たなくても、そこで終わり）
+const ago = h => ({ createdAt: { timestampValue: new Date(Date.now() - h * 3600000).toISOString() } });
+const [I, J] = await Promise.all(['I', 'J'].map(client));
+const old = await plant(A), fresh = await plant(A);
+await adminPatch(`seeds/${old}`, ago(24.1));
+await adminPatch(`seeds/${fresh}`, ago(23.5));
+await expect(false, '蒔いてから 24 時間を過ぎた種を受け取る', () => deliver(I, old));
+await expect(true, '蒔いてから 24 時間以内の種を受け取る', () => deliver(J, fresh));
+
 done();

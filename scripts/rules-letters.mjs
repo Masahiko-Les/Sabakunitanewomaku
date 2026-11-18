@@ -45,4 +45,16 @@ await expect(false, 'hidden になった種に手紙を書く（D）', () => set
 
 await expect(true, 'hidden になっても、蒔いた本人は自分の種の手紙を読める', () => getDocs(collection(A.db, 'seeds', S, 'letters')));
 
+// 種と芽は、蒔いてから 1 週間で消える。手紙もありがとうも、それまで
+const ago = d => ({ createdAt: { timestampValue: new Date(Date.now() - d * 86400000).toISOString() } });
+const W = await plant(A);
+await deliver(C, W); await deliver(D, W);
+await expect(true, '6 日目：届いた種に手紙を書く（C）', async () => { await adminPatch(`seeds/${W}`, ago(6)); await setDoc(L(C, W), letter(C)); });
+await expect(true, '6 日目：蒔いた人が自分に手紙を書く', () => setDoc(L(A, W), letter(A)));
+await adminPatch(`seeds/${W}`, ago(7.01));
+await expect(false, '1 週間を過ぎてから、届いた種に手紙を書く（D）', () => setDoc(L(D, W), letter(D)));
+await expect(false, '1 週間を過ぎてから、ありがとうを返す', () => updateDoc(L(A, W, C.uid), { thanked: true, thankedAt: serverTimestamp() }));
+await expect(true, '1 週間を過ぎても、蒔いた人は手紙を読める', () => getDocs(collection(A.db, 'seeds', W, 'letters')));
+await expect(true, '1 週間を過ぎても、書いた人は自分の手紙を読める', () => getDoc(L(C, W)));
+
 done();
