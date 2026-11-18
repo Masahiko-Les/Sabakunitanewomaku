@@ -80,7 +80,7 @@ for (const n of ['terms', 'privacy', 'contact']) { await lp.goto(`${URL}/${n}.ht
 await lp.close();
 
 // ── すべてのデータを消す
-await page.mouse.click(237, 453); await page.waitForTimeout(3500);
+await page.mouse.click(285, 309); await page.waitForTimeout(3500);
 await page.click('#btnPlant'); await page.fill('#tH', '消す前の種です。'); await page.fill('#tF', 'あとで消える世界に蒔いた。');
 await page.click('#ok'); await page.waitForTimeout(2000);
 // ほかのテストの種が届いていることもあるので、自分の種（kind: own）だけを数える

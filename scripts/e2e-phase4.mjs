@@ -114,7 +114,7 @@ check(h.deliveredCount === 0 && per.flat().every(t => t.seedId !== H), 'hidden �
 // ── 3. 配置：村の中心部・飾り・ほかの種と重ならない（同じ世界の中で重複なし）
 for (const [i, r] of per.entries()) {
   const keys = r.map(t => `${t.x},${t.y}`);
-  const core = r.some(t => Math.hypot(t.x + .5 - 50, t.y + .5 - 49.6) <= 2.6);
+  const core = r.some(t => Math.hypot(t.x + .5 - 50, t.y + .5 - 49.6) <= 2.0);
   check(new Set(keys).size === keys.length && !core, `${names[i]} の世界：重なりなし・村の中心部なし（${keys.join(' ')}）`);
 }
 

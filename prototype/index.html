@@ -111,13 +111,16 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 /* ---------- the village (future: more villages in the desert) ---------- */
 const VC={x:50*TILE,y:49.6*TILE};
 // core: the village itself (no planting). r: the green land around it where the first seeds can go.
-const VILLAGES=[{id:'hajimari',name:'はじまりの村',x:VC.x/TILE,y:VC.y/TILE,core:2.6,r:3.6}];
+const VILLAGES=[{id:'hajimari',name:'はじまりの村',x:VC.x/TILE,y:VC.y/TILE,core:2.0,r:2.3}];
 const HOUSE={x:VC.x,y:VC.y-40};
 const FIRE={x:VC.x,y:VC.y+12};
 const TREES=[];
 const GRAN={x:VC.x-50,y:VC.y+10};
 const BUSHES=[[-112,-55,1],[85,-25,.9],[-40,92,.8],[72,88,1],[-98,-22,.85]].map(([dx,dy,s])=>({x:VC.x+dx,y:VC.y+dy,s}));
 const inVillage=(tx,ty)=>VILLAGES.some(v=>Math.hypot(tx+.5-v.x,ty+.5-v.y)<=v.core);
+// 家と茂みの絵に重なるマスには、種を置かない
+const onDrawing=(tx,ty)=>{const cx=(tx+.5)*TILE,cy=(ty+.5)*TILE;
+ return (Math.abs(cx-HOUSE.x)<1.3*TILE&&cy>HOUSE.y-2.8*TILE&&cy<HOUSE.y+.4*TILE)||BUSHES.some(b=>Math.hypot(cx-b.x,cy-b.y)<.6*TILE)};
 
 /* ---------- sand texture ---------- */
 const SR=220, sand=document.createElement('canvas');sand.width=sand.height=SR;
@@ -232,7 +235,7 @@ function plantState(){const tx=Math.floor(P.x/TILE),ty=Math.floor((P.y+10)/TILE)
  if(inVillage(tx,ty))return{ok:false,label:'村のまわりの緑に蒔けます'};
  if(seedOn(tx,ty))return{ok:false,label:'このマスには種があります'};
  if(green[ty*N+tx]<.5)return{ok:false,label:'緑の上にだけ蒔けます'};
- if(decor[ty*N+tx])return{ok:false,label:'ここには蒔けません'};
+ if(decor[ty*N+tx]||onDrawing(tx,ty))return{ok:false,label:'ここには蒔けません'};
  return{ok:true,label:'ここに種を蒔く',tx,ty}}
 
 function update(dt,now){

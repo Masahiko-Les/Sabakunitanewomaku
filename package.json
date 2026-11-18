@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "emulators": "firebase emulators:start --project demo-sabaku",
-    "test:rules": "firebase emulators:exec --only auth,firestore --project demo-sabaku 'node scripts/rules-users.mjs && node scripts/rules-seeds.mjs && node scripts/rules-delivery.mjs && node scripts/rules-letters.mjs'"
+    "test:rules": "firebase emulators:exec --only auth,firestore --project demo-sabaku 'node scripts/rules-users.mjs && node scripts/rules-seeds.mjs && node scripts/rules-delivery.mjs && node scripts/rules-letters.mjs && node scripts/rules-reports.mjs'"
   },
   "devDependencies": {
     "@playwright/test": "^1.65.1",

@@ -182,6 +182,24 @@ export function watchMyLetter(seedId, cb) {
   }, e => console.error('[watchMyLetter]', e));
 }
 
+/** 届いた種を知らせる：運営に知らせて、自分の世界から片付ける（タイルを消す）。 */
+export function reportSeed(seedId) {
+  if (!myUid) return Promise.resolve();
+  const b = writeBatch(db);
+  b.set(doc(db, 'reports', `${myUid}_${seedId}`), { reporterUid: myUid, kind: 'seed', seedId, writerUid: null, createdAt: serverTimestamp() });
+  b.delete(doc(db, 'worlds', myUid, 'tiles', seedId));
+  return b.commit().catch(e => console.error('[reportSeed]', e));
+}
+
+/** 自分の種に届いた手紙を知らせる：運営に知らせて、自分の画面には出さない（users.muted）。 */
+export function reportLetter(seedId, writerUid) {
+  if (!myUid) return Promise.resolve();
+  const b = writeBatch(db);
+  b.set(doc(db, 'reports', `${myUid}_${seedId}_${writerUid}`), { reporterUid: myUid, kind: 'letter', seedId, writerUid, createdAt: serverTimestamp() });
+  b.update(userRef, { [`muted.${seedId}_${writerUid}`]: true });
+  return b.commit().catch(e => console.error('[reportLetter]', e));
+}
+
 /** 手紙を書く（1 つの種に 1 人 1 回。ドキュメント ID が自分の uid）。 */
 export function writeLetter(seedId, text) {
   if (!myUid) return Promise.resolve();

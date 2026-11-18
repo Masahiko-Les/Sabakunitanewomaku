@@ -92,7 +92,7 @@ async function waitFor(fn, ms = 10000) { const end = Date.now() + ms; while (Dat
 
 // ── A が種を蒔く
 const A = await player('A');
-await A.page.mouse.click(237, 453); await A.page.waitForTimeout(3500);
+await A.page.mouse.click(285, 309); await A.page.waitForTimeout(3500);
 const H1 = '人と話すとき、言葉が詰まってしまう。';
 await A.page.click('#btnPlant'); await A.page.fill('#tH', H1); await A.page.fill('#tF', '最初のひと言を「あの」で始めている。');
 await A.page.click('#ok'); await A.page.waitForTimeout(1500);

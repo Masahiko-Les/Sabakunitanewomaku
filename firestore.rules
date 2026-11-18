@@ -28,7 +28,7 @@ service cloud.firestore {
     }
     function okUser(d) {
       return d.keys().hasOnly(['createdAt','tutorial','metGranny','introSeen','grannyLetter',
-                               'receivedToday','receivedDate','seen','sampleLetters'])
+                               'receivedToday','receivedDate','seen','sampleLetters','muted'])
         && d.get('tutorial', 0) is int && d.get('tutorial', 0) >= 0 && d.get('tutorial', 0) <= 3
         && d.get('metGranny', false) is bool
         && d.get('introSeen', false) is bool
@@ -37,6 +37,8 @@ service cloud.firestore {
         && d.get('receivedToday', 0) is int && d.get('receivedToday', 0) >= 0 && d.get('receivedToday', 0) <= 3
         && okDate(d.get('receivedDate', ''))
         && (d.get('seen', {}) is map && d.get('seen', {}).size() <= 2000)
+        // 知らせた手紙（自分の画面に出さない）
+        && (d.get('muted', {}) is map && d.get('muted', {}).size() <= 2000)
         && okSamples(d.get('sampleLetters', {}));
     }
     // 1 日の受け取り数は、同じ日のうちは減らせない。日付は進めることしかできず、進めたら 1 から数え直す
@@ -163,6 +165,32 @@ service cloud.firestore {
 
         allow delete: if false;
       }
+    }
+
+    // ---------- reports（知らせる）----------
+    // 書けるのは自分の世界にあるものだけ。ID が決まっているので、同じものを 2 度は知らせられない。
+    // 読むのは運営（Firebase コンソール）だけ
+    match /reports/{rid} {
+      function rd() { return request.resource.data; }
+      allow create: if signedIn()
+        && rd().keys().hasOnly(['reporterUid','kind','seedId','writerUid','createdAt'])
+        && rd().reporterUid == me()
+        && rd().createdAt == request.time
+        && rd().seedId is string
+        && (
+          // 届いた種を知らせる（同じバッチで、自分の世界のタイルを消す）
+          (rd().kind == 'seed' && rd().writerUid == null
+            && rid == me() + '_' + rd().seedId
+            && exists(/databases/$(db)/documents/worlds/$(me())/tiles/$(rd().seedId))
+            && get(/databases/$(db)/documents/seeds/$(rd().seedId)).data.ownerUid != me())
+          ||
+          // 自分の種に届いた、ほかの人の手紙を知らせる
+          (rd().kind == 'letter' && rd().writerUid is string && rd().writerUid != me()
+            && rid == me() + '_' + rd().seedId + '_' + rd().writerUid
+            && get(/databases/$(db)/documents/seeds/$(rd().seedId)).data.ownerUid == me()
+            && exists(/databases/$(db)/documents/seeds/$(rd().seedId)/letters/$(rd().writerUid)))
+        );
+      allow read, update, delete: if false;
     }
   }
 }

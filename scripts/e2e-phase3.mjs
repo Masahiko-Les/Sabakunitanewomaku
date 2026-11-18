@@ -50,8 +50,8 @@ await fetch(`${FS}/users/${uid}?updateMask.fieldPaths=tutorial&updateMask.fieldP
 });
 await page.reload({ waitUntil: 'load' }); await boot();
 
-// 村の南東の緑のマス (51,53) まで歩く
-await page.mouse.click(237, 453);
+// 村の東の緑のマス (52,50) まで歩く
+await page.mouse.click(285, 309);
 await page.waitForTimeout(3500);
 check((await label()).includes('ここに種を蒔く'), `蒔けるマスに立った（${await label()}）`);
 
@@ -66,7 +66,7 @@ await plant(H1, F1);
 await page.screenshot({ path: `${OUT}/p3_1_planted.png` });
 
 let tiles = await listDocs(`worlds/${uid}/tiles`);
-check(tiles.length === 1 && tiles[0].kind === 'own' && tiles[0].x === 51 && tiles[0].y === 53, `タイルが保存された ${JSON.stringify(tiles)}`);
+check(tiles.length === 1 && tiles[0].kind === 'own' && tiles[0].x === 52 && tiles[0].y === 50, `タイルが保存された ${JSON.stringify(tiles)}`);
 let seed = tiles[0] && await getDocJSON(`seeds/${tiles[0].seedId}`);
 check(seed && seed.ownerUid === uid && seed.h === H1 && seed.f === F1 && seed.status === 'public' && seed.open === true
   && seed.deliveredCount === 0 && seed.deliveredTo.length === 0 && seed.flower >= 0 && seed.flower <= 4 && seed.createdAt,
@@ -81,19 +81,19 @@ await page.screenshot({ path: `${OUT}/p3_2_mine_after_reload.png` });
 await page.evaluate(() => document.querySelector('.scrim').click()); await page.waitForTimeout(400);
 
 // 蒔いた種のマスをタップすると、その種のシートが開く（種のマスには立てない＝同じマスには蒔けない）
-await page.mouse.click(237, 453); await page.waitForTimeout(2500);
+await page.mouse.click(285, 309); await page.waitForTimeout(2500);
 check((await page.textContent('#sheetBody')).includes(H1) && (await page.textContent('#sheetBody')).includes('あなたの種'),
   '蒔いた種のマスをタップすると「あなたの種」が開く');
 
 // 危機的な言葉 → hidden で保存、相談先シート
 await page.reload({ waitUntil: 'load' }); await boot();
-await page.mouse.click(141, 453); await page.waitForTimeout(3500); // 初期位置から (49,53)
+await page.mouse.click(285, 213); await page.waitForTimeout(3500); // 初期位置から (52,48)
 check((await label()).includes('ここに種を蒔く'), `となりの蒔けるマスに立った（${await label()}）`);
 await plant('もう消えたいと思う日がある。', '夜は早く寝るようにしている。');
 check((await page.textContent('#sheetBody')).includes('種を預かりました'), '相談先シートが出た');
 await page.screenshot({ path: `${OUT}/p3_3_crisis.png` });
 tiles = await listDocs(`worlds/${uid}/tiles`);
-const hiddenTile = tiles.find(t => t.x !== 51);
+const hiddenTile = tiles.find(t => t.y !== 50);
 seed = hiddenTile && await getDocJSON(`seeds/${hiddenTile.seedId}`);
 check(seed && seed.status === 'hidden' && seed.open === false, `危機ワードの種は hidden・open=false で保存 ${seed && seed.status}`);
 

@@ -1,6 +1,6 @@
 import './style.css';
 import { enabled as FB, initUser, saveUser, loadMyWorld, plantSeed, findDeliverable, receiveSeed,
-  getUid, watchLetters, watchMyLetter, writeLetter, thankLetter, resetAll } from './firebase.js';
+  getUid, watchLetters, watchMyLetter, writeLetter, thankLetter, resetAll, reportSeed, reportLetter } from './firebase.js';
 
 // 見本の種 8 つを置くか。公開版では置かない（最初は種も花もない）。VITE_USE_SAMPLES=true で試作版と同じく置く
 const USE_SAMPLES = import.meta.env.VITE_USE_SAMPLES === 'true';
@@ -8,6 +8,8 @@ const USE_SAMPLES = import.meta.env.VITE_USE_SAMPLES === 'true';
 const DAILY_RECEIVE = 3;
 // 種と芽が消えるまで（蒔いてから）。花は消えない
 const SEED_LIFE = 7 * 24 * 60 * 60 * 1000;
+// 届いた種で埋めずに、自分で蒔けるように残しておく緑のマスの数
+const KEEP_FREE = 2;
 // 配達を見にいく間隔（アプリを開いている間）
 const DELIVERY_INTERVAL = 5 * 60 * 1000;
 
@@ -31,13 +33,16 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
 /* ---------- the village ---------- */
 const VC={x:50*TILE,y:49.6*TILE};
-const VILLAGES=[{id:'hajimari',name:'はじまりの村',x:VC.x/TILE,y:VC.y/TILE,core:2.6,r:3.6}];
+const VILLAGES=[{id:'hajimari',name:'はじまりの村',x:VC.x/TILE,y:VC.y/TILE,core:2.0,r:2.3}];
 const HOUSE={x:VC.x,y:VC.y-40};
 const FIRE={x:VC.x,y:VC.y+12};
 const TREES=[];
 const GRAN={x:VC.x-50,y:VC.y+10};
 const BUSHES=[[-112,-55,1],[85,-25,.9],[-40,92,.8],[72,88,1],[-98,-22,.85]].map(([dx,dy,s])=>({x:VC.x+dx,y:VC.y+dy,s}));
 const inVillage=(tx,ty)=>VILLAGES.some(v=>Math.hypot(tx+.5-v.x,ty+.5-v.y)<=v.core);
+// 家と茂みの絵に重なるマスには、種を置かない
+const onDrawing=(tx,ty)=>{const cx=(tx+.5)*TILE,cy=(ty+.5)*TILE;
+ return (Math.abs(cx-HOUSE.x)<1.3*TILE&&cy>HOUSE.y-2.8*TILE&&cy<HOUSE.y+.4*TILE)||BUSHES.some(b=>Math.hypot(cx-b.x,cy-b.y)<.6*TILE)};
 
 /* ---------- sand texture ---------- */
 const SR=220, sand=document.createElement('canvas');sand.width=sand.height=SR;
@@ -69,6 +74,7 @@ const decor=new Uint8Array(N*N), decoList=[];
 const KEY='sabaku-ni-tane-v3';
 let S={seeds:[],init:false,introSeen:false};
 let ready=false; // users/{uid} を読み終えるまで操作を受け付けない
+const MUTED={}; // 知らせた手紙（users/{uid}.muted、'種ID_書いた人' → true）。自分の画面には出さない
 const SEEN={}; // 種ごとに、最後に見たできごとの時刻（users/{uid}.seen）
 const FLOWERS=[{p:'#f29bb0',c:'#f7d36b',n:5,g:'255,150,180'},{p:'#f7c948',c:'#c97b2b',n:8,g:'255,210,90'},{p:'#ffffff',c:'#f2c14e',n:6,g:'255,250,235'},{p:'#b79be8',c:'#f5e08a',n:5,g:'190,160,255'},{p:'#f59a7a',c:'#fff1c1',n:6,g:'255,170,130'}];
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
@@ -152,7 +158,7 @@ function plantState(){const tx=Math.floor(P.x/TILE),ty=Math.floor((P.y+10)/TILE)
  if(inVillage(tx,ty))return{ok:false,label:'村のまわりの緑に蒔けます'};
  if(seedOn(tx,ty))return{ok:false,label:'このマスには種があります'};
  if(green[ty*N+tx]<.5)return{ok:false,label:'緑の上にだけ蒔けます'};
- if(decor[ty*N+tx])return{ok:false,label:'ここには蒔けません'};
+ if(decor[ty*N+tx]||onDrawing(tx,ty))return{ok:false,label:'ここには蒔けません'};
  return{ok:true,label:'ここに種を蒔く',tx,ty}}
 
 function update(dt,now){
@@ -375,8 +381,13 @@ function openSeed(s){if(s.mine)return openMine(s);if(s.granny)return openGrannyS
   <div class="row"><button class="btn ghost small" id="x">閉じる</button><button class="btn main small" id="ok" disabled>水をあげる</button></div>`}
  else{body+=`<div class="letter"><div class="from">あなたが届けた手紙</div><div class="txt">${esc(mine.text)}</div></div>
   <p class="state">${mine.thanked?'ありがとうが返ってきて、花がひとつ咲きました。':'手紙は届いています。'}</p><div class="row"><button class="btn soft small" id="x">閉じる</button></div>`}
+ const canRep=FB&&!s.sample&&!s.granny;
+ if(canRep)body=body.replace(/(<div class="row">[^]*<\/div>)$/,'<div class="row" style="justify-content:flex-start;margin-top:8px"><button class="btn ghost small" id="rep" style="padding-left:0">この種を知らせる</button></div>$1');
  markSeen(s);
- openSheet(body,el=>{el.querySelector('#x').onclick=closeSheet;const ta=el.querySelector('#tL');if(!ta)return;
+ openSheet(body,el=>{el.querySelector('#x').onclick=closeSheet;
+  const rp=el.querySelector('#rep');if(rp)rp.onclick=()=>{if(!rp.dataset.c){rp.dataset.c=1;rp.textContent='本当に知らせる';return}
+   reportSeed(s.id);stopWatch(s.id);S.seeds=S.seeds.filter(z=>z!==s);save();rebuildWorld();refreshDot();closeSheet();toast('知らせました。この種は、あなたの世界から見えなくなります')};
+  const ta=el.querySelector('#tL');if(!ta)return;
   const ok=el.querySelector('#ok');lineLimit(ta,10,el.querySelector('#cL'));ta.addEventListener('input',()=>ok.disabled=!ta.value.trim());
   ok.onclick=()=>{const l={id:getUid()||uid(),from:'me',text:ta.value.trim(),t:Date.now(),thanked:false};s.letters.push(l);save();
    if(s.sample)saveUser({['sampleLetters.'+s.id]:{text:l.text,t:l.t,thanked:false}});
@@ -385,7 +396,7 @@ function openSeed(s){if(s.mine)return openMine(s);if(s.granny)return openGrannyS
 function openMine(s){
  const self=s.letters.find(l=>l.from==='me');
  const letters=s.letters.map(l=>`<div class="letter"><div class="from">${l.from==='me'?'自分から自分への手紙':'誰かからの手紙'}</div><div class="txt">${esc(l.text)}</div>
-  <div class="act">${l.thanked?'ありがとうを返しました':expired(s)?'':`<button class="btn main small" data-thx="${l.id}">ありがとう</button>`}</div></div>`).join('');
+  <div class="act">${FB&&l.from!=='me'?`<button class="btn ghost small" data-rep="${l.id}" style="margin-right:auto;padding-left:0">この手紙を知らせる</button>`:''}${l.thanked?'ありがとうを返しました':expired(s)?'':`<button class="btn main small" data-thx="${l.id}">ありがとう</button>`}</div></div>`).join('');
  const body=`<div class="kicker">あなたの種</div><p class="slabel">生きづらさ：</p><p class="hard">${esc(s.h)}</p><p class="slabel">それにどう向き合っているか：</p><p class="face">${esc(s.f)}</p>
  <p class="state">${s.hidden?'この種は、ほかの人には見えない場所に置いてあります':stageText[stageOf(s)]}</p>
  ${s.letters.length?`<div class="sec">届いた手紙</div>${letters}`:`<p class="empty">まだ手紙は届いていません。誰かが通りかかるのを、静かに待っています。</p>`}
@@ -393,6 +404,8 @@ function openMine(s){
  <div class="row"><button class="btn soft small" id="x">閉じる</button></div>`;
  markSeen(s);
  openSheet(body,el=>{el.querySelector('#x').onclick=closeSheet;
+  el.querySelectorAll('[data-rep]').forEach(b=>b.onclick=()=>{if(!b.dataset.c){b.dataset.c=1;b.textContent='本当に知らせる';return}
+   const w=b.dataset.rep;MUTED[s.id+'_'+w]=true;reportLetter(s.id,w);s.letters=s.letters.filter(z=>z.id!==w);save();rebuildWorld();refreshDot();openMine(s);toast('知らせました。この手紙は、もう表示されません')});
   el.querySelectorAll('[data-thx]').forEach(b=>b.onclick=()=>{const l=s.letters.find(z=>z.id===b.dataset.thx);if(!l)return;l.thanked=true;l.thankedAt=Date.now();save();thankLetter(s.id,l.id);
    b.parentElement.textContent='ありがとうを返しました';if(!s.hidden){bloom(s);setTimeout(closeSheet,500)}});
   const sb=el.querySelector('#selfBtn');if(sb)sb.onclick=()=>{const w=el.querySelector('#selfWrap');
@@ -554,7 +567,7 @@ requestAnimationFrame(frame);refreshDot();
 /* ---------- user (Firestore) ---------- */
 // 講習の進み具合・説明を見たか・おばあちゃんへの手紙は users/{uid} を正とする
 function applyUser(u){if(!u)return;S.tutorial=u.tutorial||0;S.metGranny=!!u.metGranny;S.introSeen=!!u.introSeen;
- U.receivedToday=u.receivedToday||0;U.receivedDate=u.receivedDate||'';Object.assign(SEEN,u.seen||{});
+ U.receivedToday=u.receivedToday||0;U.receivedDate=u.receivedDate||'';Object.assign(SEEN,u.seen||{});Object.assign(MUTED,u.muted||{});
  for(const s of S.seeds){if(!s.sample)continue;const l=(u.sampleLetters||{})[s.id];
   if(l)s.letters=[{id:'sample-letter',from:'me',text:l.text,t:l.t,thanked:!!l.thanked}];else s.letters=[]}
  const g=grannySeed();if(g)g.letters=u.grannyLetter?[{id:'granny-letter',from:'me',text:u.grannyLetter,t:Date.now(),thanked:S.tutorial>=2}]:[];
@@ -579,7 +592,7 @@ function sampleThanks(){const t=dayKey(Date.now());let ch=false;
 
 /* ---------- delivery: まだ 5 つの世界に届いていない種を、自分の世界に受け取る ---------- */
 function freeGreenTiles(){const out=[];
- for(let y=0;y<N;y++)for(let x=0;x<N;x++){if(green[y*N+x]<.5||inVillage(x,y)||decor[y*N+x]||seedOn(x,y))continue;out.push([x,y])}
+ for(let y=0;y<N;y++)for(let x=0;x<N;x++){if(green[y*N+x]<.5||inVillage(x,y)||decor[y*N+x]||onDrawing(x,y)||seedOn(x,y))continue;out.push([x,y])}
  return out}
 // ほかの人と同時に受け取ろうとすると、ルールで弾かれる（先に書いた人がいる）ので、少し待って読み直す
 async function receiveWithRetry(id,x,y,t){
@@ -594,7 +607,7 @@ async function receiveSeeds(){if(!FB||delivering||!ready)return;delivering=true;
   for(let round=0;round<3&&n<DAILY_RECEIVE;round++){
   const ids=await findDeliverable(new Set(S.seeds.map(s=>s.id)),(DAILY_RECEIVE-n)*4).catch(e=>{console.error('[findDeliverable]',e);return[]});if(!ids.length)break;
   for(const id of ids){if(n>=DAILY_RECEIVE)break;
-   const free=freeGreenTiles();if(!free.length)break; // 空いている緑のマスがなければ、次の機会に回す
+   const free=freeGreenTiles();if(free.length<=KEEP_FREE)break; // 自分で蒔く場所を残し、それ以上空いていなければ、次の機会に回す
    const[x,y]=free[Math.floor(Math.random()*free.length)];
    const r=await receiveWithRetry(id,x,y,t);
    if(!r)continue;n=r.count;U.receivedToday=n;U.receivedDate=t;
@@ -617,7 +630,7 @@ function prune(){const gone=S.seeds.filter(s=>expired(s)&&s.loaded&&stageOf(s)!=
 // 自分の種：届いた手紙をずっと見張る（蒔いた人だけが読める）
 function watchOwn(s){if(!FB||watchers.has(s.id))return;
  watchers.set(s.id,watchLetters(s.id,ls=>{const me=getUid();s.loaded=true;
-  s.letters=ls.sort((a,b)=>a.t-b.t).map(l=>({id:l.id,from:l.writerUid===me?'me':'other',text:l.text,t:l.t,thanked:l.thanked,thankedAt:l.thankedAt}));
+  s.letters=ls.filter(l=>!MUTED[s.id+'_'+l.id]).sort((a,b)=>a.t-b.t).map(l=>({id:l.id,from:l.writerUid===me?'me':'other',text:l.text,t:l.t,thanked:l.thanked,thankedAt:l.thankedAt}));
   s.unread=lastEvent(s)>(SEEN[s.id]||0);rebuildSoon()}))}
 // 届いた種：自分が書いた手紙に、ありがとうが返ってくるまで見張る（返ったら取り消せないので、そこで終わり）
 function watchReceived(s){if(!FB||watchers.has(s.id))return;
