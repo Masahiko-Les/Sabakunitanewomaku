@@ -57,7 +57,7 @@ textarea:focus{border-color:#e0b48e}
 .care{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px 16px;line-height:1.85;font-size:14.5px}
 .care a{color:var(--accent)}
 .talk{display:flex;flex-direction:column;gap:8px}
-.bub{align-self:flex-start;max-width:90%;background:#fff;border:1px solid var(--line);border-radius:4px 16px 16px 16px;padding:10px 14px;line-height:1.85;font-size:15px;animation:fadein .35s}
+.bub{white-space:pre-line;align-self:flex-start;max-width:90%;background:#fff;border:1px solid var(--line);border-radius:4px 16px 16px 16px;padding:10px 14px;line-height:1.85;font-size:15px;animation:fadein .35s}
 .bub.me{align-self:flex-end;background:#f6e3cf;border-color:#f0d3b6;border-radius:16px 4px 16px 16px}
 .topics{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;justify-content:flex-end}
 .topic{font:inherit;font-size:14px;border:1px solid #e9c4a3;background:#fff;color:#b8653f;border-radius:999px;padding:8px 14px;cursor:pointer}

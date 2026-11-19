@@ -47,6 +47,14 @@ await expect(false, '見本の種への手紙に余計なフィールド', () =>
 await expect(false, '1 日の受け取り数を 4 にする', () => updateDoc(U(A), { receivedToday: 4 }));
 await expect(false, '受け取りの日付の形がおかしい', () => updateDoc(U(A), { receivedDate: 'tomorrow' }));
 
+// オープニング：見た印と関心テーマ
+await expect(true, '関心テーマを保存する（吃音）', () => updateDoc(U(B), { interest: '吃音' }));
+await expect(true, '関心テーマを保存する（まだ、言葉にできない＝none）', () => updateDoc(U(B), { interest: 'none' }));
+await expect(true, 'スキップ：関心テーマは null、見た印を付ける', () => updateDoc(U(B), { interest: null, openingSeen: true }));
+await expect(false, '選択肢にない関心テーマ', () => updateDoc(U(B), { interest: '自由に書いた文' }));
+await expect(false, '関心テーマに文字列以外', () => updateDoc(U(B), { interest: 3 }));
+await expect(false, '見た印に bool 以外', () => updateDoc(U(B), { openingSeen: 'yes' }));
+
 // 「すべてのデータを消す」
 await expect(true, 'A が自分の users を消す（すべてのデータを消す）', () => deleteDoc(U(A)));
 

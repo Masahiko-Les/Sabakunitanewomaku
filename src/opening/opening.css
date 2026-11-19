@@ -1,0 +1,29 @@
+/* オープニング（opening-prototype.html の CSS をそのまま移植。#opening の中だけに効くようにしている） */
+#opening *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+#opening{position:fixed;inset:0;z-index:1000;background:#000;overflow:hidden;font-family:'Zen Maru Gothic',system-ui,sans-serif;color:#fff;user-select:none;-webkit-user-select:none;font-weight:500}
+/* 試作は Zen Maru Gothic の 500/700 だけを読み込むので、ふつうの文字は 500 で表示される。アプリは 400 も読むため、500 を明示して同じにする */
+/* 着地：閃光の下に、アプリ本来の地図が見える */
+#opening.landed{background:transparent}
+#opening #stage{position:fixed;inset:0;touch-action:manipulation;cursor:pointer}
+#opening canvas{touch-action:auto;position:absolute;inset:0;width:100%;height:100%;display:block}
+#opening #girl{position:absolute;left:50%;top:29%;height:62px;width:auto;transform:translate(-50%,-50%);opacity:0;pointer-events:none;filter:drop-shadow(0 0 10px rgba(255,170,170,.18))}
+#opening #skip{position:absolute;top:calc(env(safe-area-inset-top) + 14px);right:16px;z-index:10;background:rgba(255,255,255,.07);color:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.16);border-radius:999px;padding:6px 14px;font:inherit;font-size:13px;cursor:pointer;transition:opacity .6s}
+#opening #skip.hide{opacity:0;pointer-events:none}
+#opening #voice{position:absolute;left:0;right:0;top:47%;padding:0 28px;text-align:center;font-size:17px;line-height:1.95;letter-spacing:.08em;white-space:pre-line;color:#eef0ff;text-shadow:0 0 12px rgba(160,180,255,.5);min-height:4em;transition:opacity .8s}
+#opening #voice.hide{opacity:0}
+#opening .next{display:inline-block;margin-left:6px;font-size:10px;opacity:0;vertical-align:middle}
+#opening .next.on{opacity:1;animation:blink 1.2s infinite}
+@keyframes blink{50%{opacity:.15}}
+#opening #chips{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 26px);padding:0 20px;display:flex;flex-wrap:wrap;gap:8px;justify-content:center;opacity:0;transform:translateY(12px);transition:opacity .8s,transform .8s;pointer-events:none;max-width:560px;margin:0 auto}
+#opening #chips.on{opacity:1;transform:none;pointer-events:auto}
+#opening .chip{font:inherit;font-size:14px;color:#e8ebff;background:rgba(150,165,255,.08);border:1px solid rgba(190,200,255,.32);border-radius:999px;padding:8px 14px;cursor:pointer;transition:background .3s,color .3s,transform .2s,opacity .5s}
+#opening .chip:active{transform:scale(.96)}
+#opening .chip.picked{background:rgba(255,255,255,.92);color:#1a1d33}
+#opening .chip.dim{opacity:.25}
+#opening .chip.wide{flex-basis:100%;max-width:280px;border-style:dashed;color:rgba(232,235,255,.75);background:transparent}
+#opening #title{position:absolute;left:0;right:0;top:22%;text-align:center;font-weight:700;font-size:30px;letter-spacing:.35em;padding-left:.35em;color:#fff;text-shadow:0 0 18px rgba(255,230,180,.8),0 0 40px rgba(255,200,120,.4);opacity:0;transform:scale(.95);filter:blur(6px);transition:opacity 1.4s,transform 3.5s ease-out,filter 1.4s;pointer-events:none}
+#opening #title.on{opacity:1;transform:scale(1);filter:blur(0)}
+#opening #tapHint{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 18%);text-align:center;font-size:13px;letter-spacing:.3em;color:rgba(255,240,220,.75);opacity:0;transition:opacity 1.2s;pointer-events:none}
+#opening #tapHint.on{opacity:1;animation:breathe 2.6s ease-in-out infinite}
+@keyframes breathe{50%{opacity:.35}}
+#opening #title small{display:block;margin-top:14px;font-size:11px;letter-spacing:.45em;font-weight:500;opacity:.65}

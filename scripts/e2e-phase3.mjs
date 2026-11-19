@@ -1,6 +1,7 @@
 // フェーズ3確認用：種を蒔く → seeds と worlds/{uid}/tiles に保存 → 再読み込み・localStorage 削除後も自分の世界に残る
 // 前提：npm run emulators と、.env.local で VITE_USE_EMULATOR=true にした npm run dev が動いていること
 import { chromium } from '@playwright/test';
+import { newContext } from './skip-opening.mjs';
 import { mkdir } from 'fs/promises';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -27,7 +28,7 @@ let failed = false;
 const check = (c, m) => { console.log(c ? 'OK:' : 'NG:', m); if (!c) failed = true; };
 
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 390, height: 780 }, deviceScaleFactor: 2 });
+const ctx = await newContext(browser, { viewport: { width: 390, height: 780 }, deviceScaleFactor: 2 });
 const page = await ctx.newPage();
 page.on('console', m => { if (m.type() === 'error') console.log('[console]', m.text()); });
 

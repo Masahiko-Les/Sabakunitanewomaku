@@ -1,6 +1,7 @@
 // 見本の種への手紙：どこにも届かず、翌日に「ありがとう」が返って花が咲く
 // 前提：npm run emulators と、.env.local で VITE_USE_EMULATOR=true・VITE_USE_SAMPLES=true にした npm run dev が動いていること
 import { chromium } from '@playwright/test';
+import { newContext } from './skip-opening.mjs';
 
 const URL = 'http://localhost:5173';
 const FS = 'http://127.0.0.1:8080/v1/projects/demo-sabaku/databases/(default)/documents';
@@ -13,7 +14,7 @@ let failed = false;
 const check = (c, m) => { console.log(c ? 'OK:' : 'NG:', m); if (!c) failed = true; };
 
 const browser = await chromium.launch();
-const page = await (await browser.newContext({ viewport: { width: 390, height: 780 }, deviceScaleFactor: 2 })).newPage();
+const page = await (await newContext(browser, { viewport: { width: 390, height: 780 }, deviceScaleFactor: 2 })).newPage();
 page.on('console', m => { if (m.type() === 'error') console.log('[console]', m.text()); });
 const uidOf = () => page.evaluate(() => new Promise(res => {
   const req = indexedDB.open('firebaseLocalStorageDb');

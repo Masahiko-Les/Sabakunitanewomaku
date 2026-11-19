@@ -28,7 +28,8 @@ service cloud.firestore {
     }
     function okUser(d) {
       return d.keys().hasOnly(['createdAt','tutorial','metGranny','introSeen','grannyLetter',
-                               'receivedToday','receivedDate','seen','sampleLetters','muted'])
+                               'receivedToday','receivedDate','seen','sampleLetters','muted',
+                               'openingSeen','interest'])
         && d.get('tutorial', 0) is int && d.get('tutorial', 0) >= 0 && d.get('tutorial', 0) <= 3
         && d.get('metGranny', false) is bool
         && d.get('introSeen', false) is bool
@@ -37,6 +38,10 @@ service cloud.firestore {
         && d.get('receivedToday', 0) is int && d.get('receivedToday', 0) >= 0 && d.get('receivedToday', 0) <= 3
         && okDate(d.get('receivedDate', ''))
         && (d.get('seen', {}) is map && d.get('seen', {}).size() <= 2000)
+        // オープニング：見たかどうかと、女の子の問いで選んだ関心テーマ（スキップしたときは null）
+        && d.get('openingSeen', false) is bool
+        && (d.get('interest', null) == null
+            || d.interest in ['吃音','うつ','不安・パニック','摂食障害','発達の特性','介護','子育て','不登校・ひきこもり','仕事','人間関係','その他','none'])
         // 知らせた手紙（自分の画面に出さない）
         && (d.get('muted', {}) is map && d.get('muted', {}).size() <= 2000)
         && okSamples(d.get('sampleLetters', {}));

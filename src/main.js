@@ -1,6 +1,7 @@
 import './style.css';
 import { enabled as FB, initUser, saveUser, loadMyWorld, plantSeed, findDeliverable, receiveSeed,
   getUid, watchLetters, watchMyLetter, writeLetter, thankLetter, resetAll, reportSeed, reportLetter } from './firebase.js';
+import { startOpening, grandmaLines } from './opening/opening.js';
 
 // 見本の種 8 つを置くか。公開版では置かない（最初は種も花もない）。VITE_USE_SAMPLES=true で試作版と同じく置く
 const USE_SAMPLES = import.meta.env.VITE_USE_SAMPLES === 'true';
@@ -22,6 +23,11 @@ const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 let dpr=1,vw=0,vh=0;
 function resize(){dpr=Math.min(window.devicePixelRatio||1,2);vw=innerWidth;vh=innerHeight;cv.width=dk.width=vw*dpr;cv.height=dk.height=vh*dpr;cv.style.width=vw+'px';cv.style.height=vh+'px'}
 addEventListener('resize',resize);resize();
+// オープニング（初回のみ。INTEGRATION.md）。見たかどうかがわかるまで、地図を黒い幕で覆っておく。?opening=1 で強制表示
+const OPEN_KEY='sabaku.openingSeen',INTEREST_KEY='sabaku.interest';
+const forceOpening=new URLSearchParams(location.search).get('opening')==='1';
+let openingEl=null;
+try{if(forceOpening||localStorage.getItem(OPEN_KEY)!=='1'){openingEl=document.createElement('div');openingEl.id='opening';document.body.appendChild(openingEl)}}catch(e){}
 
 /* ---------- noise ---------- */
 function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
@@ -189,11 +195,12 @@ function update(dt,now){
 /* ---------- sky ---------- */
 // 昼と夜：設定で「時刻に合わせる／昼／夜」を選ぶ（このブラウザに覚えておく）
 const SKY_KEY='sabaku-sky';
+let sessionNight=false; // オープニングの着地から、この画面を開いている間だけ夜にする（保存しない）
 let night=0,skyOverride=(()=>{try{const v=localStorage.getItem(SKY_KEY);return v==='night'?true:v==='day'?false:null}catch(e){return null}})();
 const autoNight=()=>{const h=new Date().getHours();return h>=18||h<6};
-const skyNight=()=>skyOverride===null?autoNight():skyOverride;
+const skyNight=()=>sessionNight||(skyOverride===null?autoNight():skyOverride);
 const skyMode=()=>skyOverride===null?'auto':skyOverride?'night':'day';
-function setSky(m){skyOverride=m==='auto'?null:m==='night';try{localStorage.setItem(SKY_KEY,m)}catch(e){}}
+function setSky(m){sessionNight=false;skyOverride=m==='auto'?null:m==='night';try{localStorage.setItem(SKY_KEY,m)}catch(e){}}
 night=skyNight()?1:0;
 
 /* ---------- drawing ---------- */
@@ -491,6 +498,8 @@ function talkSheet(build){openSheet(`<div class="kicker">焚き火のそばの�
  build({say,you,play,button,ctl,scroll})})}
 function grannySeed(){return S.seeds.find(s=>s.granny)}
 function walkToGrannySeed(){const g=grannySeed();if(!g)return;target={x:(g.x+.5)*TILE+TILE,y:(g.y+.5)*TILE-10};pendingOpen=g.id}
+// 初回講習のはじまり：「おばあちゃんの種を見にいく」
+function goGrannySeed(){S.tutorial=1;S.metGranny=true;save();saveUser({tutorial:1,metGranny:true});closeSheet();walkToGrannySeed()}
 function finishTutorial(){S.tutorial=3;S.metGranny=true;save();saveUser({tutorial:3,metGranny:true});closeSheet();setTimeout(()=>toast('緑の上に立って、種を蒔いてみよう'),400)}
 function grannyThanks(){talkSheet(({play,button})=>play(TUT.reading,()=>button('花を見る',()=>{
  const g=grannySeed(),l=g&&myLetter(g);if(l&&!l.thanked){l.thanked=true;l.thankedAt=Date.now();save()}
@@ -507,7 +516,7 @@ function openGrannySeed(s){const mine=myLetter(s),tu=S.tutorial||0;
   const ok=el.querySelector('#ok');lineLimit(ta,10,el.querySelector('#cL'));ta.addEventListener('input',()=>ok.disabled=!ta.value.trim());
   ok.onclick=()=>{s.letters.push({id:uid(),from:'me',text:ta.value.trim(),t:Date.now(),thanked:false});S.tutorial=2;save();saveUser({tutorial:2,grannyLetter:ta.value.trim()});closeSheet();toast('水をあげました');setTimeout(grannyThanks,1600)}})}
 function openGranny(){target=null;const tu=S.tutorial||0;
- if(tu===0)return talkSheet(({play,button})=>play(TUT.intro,()=>button('おばあちゃんの種を見にいく',()=>{S.tutorial=1;S.metGranny=true;save();saveUser({tutorial:1,metGranny:true});closeSheet();walkToGrannySeed()})));
+ if(tu===0)return talkSheet(({play,button})=>play(TUT.intro,()=>button('おばあちゃんの種を見にいく',goGrannySeed)));
  if(tu===1)return talkSheet(({play,button})=>play(TUT.remind,()=>button('おばあちゃんの種を見にいく',()=>{closeSheet();walkToGrannySeed()})));
  if(tu===2)return talkSheet(({play,button})=>play(TUT.finish,()=>button('はじめる',finishTutorial)));
  talkSheet(({say,you,play,ctl,scroll})=>{
@@ -561,7 +570,7 @@ requestAnimationFrame(frame);refreshDot();
 /* ---------- user (Firestore) ---------- */
 // 講習の進み具合・説明を見たか・おばあちゃんへの手紙は users/{uid} を正とする
 function applyUser(u){if(!u)return;S.tutorial=u.tutorial||0;S.metGranny=!!u.metGranny;S.introSeen=!!u.introSeen;
- U.receivedToday=u.receivedToday||0;U.receivedDate=u.receivedDate||'';Object.assign(SEEN,u.seen||{});Object.assign(MUTED,u.muted||{});
+ U.openingSeen=!!u.openingSeen;U.receivedToday=u.receivedToday||0;U.receivedDate=u.receivedDate||'';Object.assign(SEEN,u.seen||{});Object.assign(MUTED,u.muted||{});
  for(const s of S.seeds){if(!s.sample)continue;const l=(u.sampleLetters||{})[s.id];
   if(l)s.letters=[{id:'sample-letter',from:'me',text:l.text,t:l.t,thanked:!!l.thanked}];else s.letters=[]}
  const g=grannySeed();if(g)g.letters=u.grannyLetter?[{id:'granny-letter',from:'me',text:u.grannyLetter,t:Date.now(),thanked:S.tutorial>=2}]:[];
@@ -637,7 +646,23 @@ function watchReceived(s){if(!FB||watchers.has(s.id))return;
   if(l.thanked&&!was&&!first){bloom(s);save();refreshDot()}else rebuildSoon()}))}
 function startWatchers(){for(const s of S.seeds){if(s.sample||s.granny)continue;s.mine?watchOwn(s):watchReceived(s)}}
 
+/* ---------- opening: 初回だけ、オープニング → おばあちゃんの到着のことば → 初回講習 ---------- */
+function runOpening(){let chose=false;
+ startOpening(openingEl,{
+  onChoice:v=>{chose=true;try{localStorage.setItem(INTEREST_KEY,v)}catch(e){}saveUser({interest:v})},
+  onLanding:()=>{sessionNight=true;night=1},
+  onLanded:c=>{openingEl=null;try{localStorage.setItem(OPEN_KEY,'1')}catch(e){}
+   S.introSeen=true;save();saveUser({openingSeen:true,introSeen:true,...(chose?{}:{interest:null})});U.openingSeen=true;
+   const L=grandmaLines(c);
+   // 到着のことばの最後の台詞のあと、既存の初回講習（おばあちゃんの種に水やり）へ
+   if((S.tutorial||0)===0)talkSheet(({play,button})=>play([...L,...TUT.intro],()=>button('おばあちゃんの種を見にいく',goGrannySeed)));
+   else talkSheet(({play,button})=>play(L,()=>button('はじめる',closeSheet)))}})}
+
 initUser().then(async u=>{if(u)applyWorld(await loadMyWorld());applyUser(u);startWatchers()}).catch(e=>console.error('[initUser]',e)).finally(()=>{ready=true;sampleThanks();refreshDot();
+ // はじめての人（講習を始めておらず、オープニングも見ていない）にだけ、オープニングを出す
+ if(openingEl&&(forceOpening||(!S.metGranny&&(S.tutorial||0)===0&&!U.openingSeen))){runOpening();receiveSeeds();setInterval(receiveSeeds,DELIVERY_INTERVAL);setInterval(()=>{sampleThanks();prune()},60*1000);return}
+ if(openingEl){openingEl.remove();openingEl=null}
+ try{localStorage.setItem(OPEN_KEY,'1')}catch(e){}
  // 「すべてのデータを消す」のあと：試作版と同じく、説明は出さずに「世界をはじめの姿に戻しました」
  let wasReset=false;try{wasReset=!!sessionStorage.getItem(RESET_KEY);sessionStorage.removeItem(RESET_KEY)}catch(e){}
  if(wasReset){S.introSeen=true;save();saveUser({introSeen:true});setTimeout(()=>toast('世界をはじめの姿に戻しました'),400)}

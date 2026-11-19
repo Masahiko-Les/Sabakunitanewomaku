@@ -3,6 +3,7 @@
 // 蒔く種には危機的な言葉を入れて hidden にし、ほかの人の世界には届かないようにする。
 // 終わったら表示される uid と seedId の後片付けを行うこと（Firestore の users/worlds/seeds と、Authentication のユーザー）。
 import { chromium } from '@playwright/test';
+import { newContext } from './skip-opening.mjs';
 import { mkdir } from 'fs/promises';
 
 const URL = process.argv[2] || 'https://sabakunitanewomaku.vercel.app';
@@ -11,7 +12,7 @@ let failed = false;
 const check = (c, m) => { console.log(c ? 'OK:' : 'NG:', m); if (!c) failed = true; };
 
 const browser = await chromium.launch();
-const page = await (await browser.newContext({ viewport: { width: 390, height: 780 }, deviceScaleFactor: 2 })).newPage();
+const page = await (await newContext(browser, { viewport: { width: 390, height: 780 }, deviceScaleFactor: 2 })).newPage();
 page.on('console', m => { if (m.type() === 'error') console.log('[console]', m.text()); });
 page.on('pageerror', e => console.log('[pageerror]', e.message));
 

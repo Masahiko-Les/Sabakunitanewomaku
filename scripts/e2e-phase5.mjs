@@ -2,6 +2,7 @@
 // A が蒔き、B の世界に届いた種に B が手紙を書き、A がありがとうを返す。どちらも再読み込みなしで届くか。
 // 前提：npm run emulators と、.env.local で VITE_USE_EMULATOR=true にした npm run dev が動いていること
 import { chromium } from '@playwright/test';
+import { newContext } from './skip-opening.mjs';
 
 const URL = 'http://localhost:5173';
 const BASE = 'http://127.0.0.1:8080';
@@ -24,7 +25,7 @@ await fetch(`${BASE}/emulator/v1/projects/demo-sabaku/databases/(default)/docume
 
 const browser = await chromium.launch();
 async function player(name) {
-  const page = await (await browser.newContext({ viewport: { width: W, height: H }, deviceScaleFactor: 2 })).newPage();
+  const page = await (await newContext(browser, { viewport: { width: W, height: H }, deviceScaleFactor: 2 })).newPage();
   page.on('console', m => { if (m.type() === 'error') console.log(`[${name} console]`, m.text()); });
   page.on('pageerror', e => console.log(`[${name} pageerror]`, e.message));
   await page.goto(URL, { waitUntil: 'load' });

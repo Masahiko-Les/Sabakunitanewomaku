@@ -2,6 +2,7 @@
 // 前提：npm run emulators と、.env.local で VITE_USE_EMULATOR=true にした npm run dev が動いていること
 // 6 つのブラウザ（B〜G）が「同時に」アプリを開き、トランザクションの取り合いも確かめる。
 import { chromium } from '@playwright/test';
+import { newContext } from './skip-opening.mjs';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, connectAuthEmulator } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator, doc, collection, writeBatch, serverTimestamp } from 'firebase/firestore';
@@ -44,7 +45,7 @@ async function plantA(h, hidden = false) {
 const browser = await chromium.launch();
 const names = ['B', 'C', 'D', 'E', 'F', 'G'];
 const pages = await Promise.all(names.map(async () => {
-  const ctx = await browser.newContext({ viewport: { width: 390, height: 780 } });
+  const ctx = await newContext(browser, { viewport: { width: 390, height: 780 } });
   const page = await ctx.newPage();
   page.on('console', m => { if (m.type() === 'error' || m.text().startsWith('[dbg]')) console.log('[console]', m.text()); });
   page.on('pageerror', e => console.log('[pageerror]', e.message));

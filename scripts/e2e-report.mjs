@@ -1,6 +1,7 @@
 // 「この種を知らせる」「この手紙を知らせる」の確認
 // 前提：npm run emulators と、.env.local で VITE_USE_EMULATOR=true にした npm run dev が動いていること
 import { chromium } from '@playwright/test';
+import { newContext } from './skip-opening.mjs';
 
 const URL = 'http://localhost:5173';
 const FS = 'http://127.0.0.1:8080/v1/projects/demo-sabaku/databases/(default)/documents';
@@ -17,7 +18,7 @@ const check = (c, m) => { console.log(c ? 'OK:' : 'NG:', m); if (!c) failed = tr
 // ほかのテストの種が届かないよう、Emulator のデータを空にしてから始める
 await fetch('http://127.0.0.1:8080/emulator/v1/projects/demo-sabaku/databases/(default)/documents', { method: 'DELETE' });
 const browser = await chromium.launch();
-const page = await (await browser.newContext({ viewport: { width: 390, height: 780 }, deviceScaleFactor: 2 })).newPage();
+const page = await (await newContext(browser, { viewport: { width: 390, height: 780 }, deviceScaleFactor: 2 })).newPage();
 page.on('pageerror', e => console.log('[pageerror]', e.message));
 page.on('console', m => { if (m.type() === 'error') console.log('[console]', m.text()); });
 const uidOf = () => page.evaluate(() => new Promise(res => {

@@ -1,6 +1,7 @@
 // フェーズ2確認用：匿名ログイン → users/{uid} 作成 → 講習の進み具合が再読み込み後も続きから再開できるか
 // 前提：npm run emulators と、.env.local で VITE_USE_EMULATOR=true にした npm run dev が動いていること
 import { chromium } from '@playwright/test';
+import { newContext } from './skip-opening.mjs';
 import { mkdir } from 'fs/promises';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -24,7 +25,7 @@ const fail = m => { console.error('NG:', m); process.exitCode = 1; };
 const check = (cond, m) => cond ? console.log('OK:', m) : fail(m);
 
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 390, height: 780 }, deviceScaleFactor: 2 });
+const ctx = await newContext(browser, { viewport: { width: 390, height: 780 }, deviceScaleFactor: 2 });
 const page = await ctx.newPage();
 page.on('console', m => { if (m.type() === 'error') console.log('[console]', m.text()); });
 

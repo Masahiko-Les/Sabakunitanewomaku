@@ -1,6 +1,7 @@
 // 種と芽は蒔いてから 1 週間で消え、花は残る／配達は蒔いてから 24 時間まで、の確認
 // 前提：npm run emulators と、.env.local で VITE_USE_EMULATOR=true にした npm run dev が動いていること
 import { chromium } from '@playwright/test';
+import { newContext } from './skip-opening.mjs';
 
 const URL = 'http://localhost:5173';
 const FS = 'http://127.0.0.1:8080/v1/projects/demo-sabaku/databases/(default)/documents';
@@ -21,7 +22,7 @@ let failed = false;
 const check = (c, m) => { console.log(c ? 'OK:' : 'NG:', m); if (!c) failed = true; };
 
 const browser = await chromium.launch();
-const page = await (await browser.newContext({ viewport: { width: 390, height: 780 }, deviceScaleFactor: 2 })).newPage();
+const page = await (await newContext(browser, { viewport: { width: 390, height: 780 }, deviceScaleFactor: 2 })).newPage();
 page.on('pageerror', e => console.log('[pageerror]', e.message));
 const uidOf = () => page.evaluate(() => new Promise(res => {
   const req = indexedDB.open('firebaseLocalStorageDb');

@@ -1,4 +1,5 @@
 import { chromium } from '@playwright/test';
+import { newContext } from './skip-opening.mjs';
 import { mkdir } from 'fs/promises';
 import { resolve } from 'path';
 import { fileURLToPath } from 'url';
@@ -12,7 +13,7 @@ await mkdir(OUT, { recursive: true });
 const browser = await chromium.launch();
 
 async function shoot(url, prefix, useLocalStorage) {
-  const ctx = await browser.newContext({
+  const ctx = await newContext(browser, {
     viewport: { width: W, height: H },
     deviceScaleFactor: DPR,
   });

@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>砂漠に種を蒔く — オープニング試作</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#000;overflow:hidden}
+body{font-family:'Zen Maru Gothic',system-ui,sans-serif;color:#fff;user-select:none;-webkit-user-select:none}
+#stage{position:fixed;inset:0;touch-action:manipulation;cursor:pointer}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#girl{position:absolute;left:50%;top:29%;height:62px;width:auto;transform:translate(-50%,-50%);opacity:0;pointer-events:none;filter:drop-shadow(0 0 10px rgba(255,170,170,.18))}
+#skip{position:absolute;top:calc(env(safe-area-inset-top) + 14px);right:16px;z-index:10;background:rgba(255,255,255,.07);color:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.16);border-radius:999px;padding:6px 14px;font:inherit;font-size:13px;cursor:pointer;transition:opacity .6s}
+#skip.hide{opacity:0;pointer-events:none}
+#voice{position:absolute;left:0;right:0;top:47%;padding:0 28px;text-align:center;font-size:17px;line-height:1.95;letter-spacing:.08em;white-space:pre-line;color:#eef0ff;text-shadow:0 0 12px rgba(160,180,255,.5);min-height:4em;transition:opacity .8s}
+#voice.hide{opacity:0}
+.next{display:inline-block;margin-left:6px;font-size:10px;opacity:0;vertical-align:middle}
+.next.on{opacity:1;animation:blink 1.2s infinite}
+@keyframes blink{50%{opacity:.15}}
+#chips{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 26px);padding:0 20px;display:flex;flex-wrap:wrap;gap:8px;justify-content:center;opacity:0;transform:translateY(12px);transition:opacity .8s,transform .8s;pointer-events:none;max-width:560px;margin:0 auto}
+#chips.on{opacity:1;transform:none;pointer-events:auto}
+.chip{font:inherit;font-size:14px;color:#e8ebff;background:rgba(150,165,255,.08);border:1px solid rgba(190,200,255,.32);border-radius:999px;padding:8px 14px;cursor:pointer;transition:background .3s,color .3s,transform .2s,opacity .5s}
+.chip:active{transform:scale(.96)}
+.chip.picked{background:rgba(255,255,255,.92);color:#1a1d33}
+.chip.dim{opacity:.25}
+.chip.wide{flex-basis:100%;max-width:280px;border-style:dashed;color:rgba(232,235,255,.75);background:transparent}
+#title{position:absolute;left:0;right:0;top:22%;text-align:center;font-weight:700;font-size:30px;letter-spacing:.35em;padding-left:.35em;color:#fff;text-shadow:0 0 18px rgba(255,230,180,.8),0 0 40px rgba(255,200,120,.4);opacity:0;transform:scale(.95);filter:blur(6px);transition:opacity 1.4s,transform 3.5s ease-out,filter 1.4s;pointer-events:none}
+#title.on{opacity:1;transform:scale(1);filter:blur(0)}
+#tapHint{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 18%);text-align:center;font-size:13px;letter-spacing:.3em;color:rgba(255,240,220,.75);opacity:0;transition:opacity 1.2s;pointer-events:none}
+#tapHint.on{opacity:1;animation:breathe 2.6s ease-in-out infinite}
+@keyframes breathe{50%{opacity:.35}}
+#title small{display:block;margin-top:14px;font-size:11px;letter-spacing:.45em;font-weight:500;opacity:.65}
+#box{position:absolute;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom) + 16px);background:#fdf8ee;color:#4a3f35;border-radius:22px;padding:18px 22px 20px;box-shadow:0 10px 40px rgba(0,0,0,.45);opacity:0;transform:translateY(20px);transition:opacity .6s,transform .6s;pointer-events:none;max-width:560px;margin:0 auto}
+#box.on{opacity:1;transform:none;pointer-events:auto}
+#name{display:inline-block;font-size:12px;color:#8a7a63;background:#f3e8d2;border-radius:999px;padding:3px 12px;margin-bottom:10px;letter-spacing:.1em}
+#line{font-size:16px;line-height:1.85;min-height:3.7em;white-space:pre-line}
+#box .next{color:#b59d78}
+#end{display:none;flex-direction:column;gap:10px;margin-top:14px}
+#end.on{display:flex}
+#end button{font:inherit;font-size:15px;border-radius:14px;padding:12px;cursor:pointer;border:1px solid #e6d7bb}
+#end .main{background:#e39b45;color:#fff;border-color:#e39b45;font-weight:700}
+#end .sub{background:transparent;color:#8a7a63}
+#note{font-size:12px;color:#a8977c;text-align:center;line-height:1.7;display:none}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="cv"></canvas>
+  <svg id="girl" viewBox="18 8 106 98" aria-hidden="true">
+    <defs>
+      <linearGradient id="gHair" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7a5a50"/><stop offset=".55" stop-color="#5a4039"/><stop offset="1" stop-color="#3e2c29"/></linearGradient>
+      <linearGradient id="gSkin" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff3ec"/><stop offset="1" stop-color="#f8d9c9"/></linearGradient>
+      <linearGradient id="gKnit" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e64a52"/><stop offset="1" stop-color="#b9283a"/></linearGradient>
+      <linearGradient id="gIris" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b1a1e"/><stop offset=".55" stop-color="#6e3d33"/><stop offset="1" stop-color="#d79a63"/></linearGradient>
+      <radialGradient id="gBlush"><stop offset="0" stop-color="#ff8f98" stop-opacity=".55"/><stop offset="1" stop-color="#ff8f98" stop-opacity="0"/></radialGradient>
+    </defs>
+    <ellipse cx="70" cy="100" rx="36" ry="3.2" fill="rgba(0,0,0,.4)"/>
+    <!-- 後ろ髪（背中に流れる） -->
+    <g transform="translate(55 58) scale(1.25) translate(-55 -58)"><path d="M62 26 C80 22 92 34 91 50 C92 59 93 66 95 72 C89 75 83 70 81 65 C78 61 75 60 72 60 Z" fill="url(#gHair)"/></g>
+    <g transform="translate(60 56) scale(.8) translate(-60 -56)">
+    <!-- 奥の脚 -->
+    <path d="M56 66 L52 98" stroke="#e8bfad" stroke-width="7.5" stroke-linecap="round"/>
+    <rect x="47.6" y="91" width="8" height="7" rx="2" fill="#e9e6e3"/>
+    <path d="M44 97 h12 q3 0 3 4 v3.5 h-18 q-2 0 -1.6 -2.6 q.8 -4.9 4.6 -4.9 z" fill="#e8e5e2"/>
+    <!-- 体（赤いニット） -->
+    <path d="M74 53 C88 51 99 62 101 80 C103 93 102 103 96 107.5 L70 108 C64 100 59 88 55 77 C52 69 53 58 60 55.5 C65 54 70 54.5 74 53 Z" fill="url(#gKnit)"/>
+    <path d="M71 107.6 L96 107" stroke="#a52234" stroke-width="3.6" opacity=".5"/>
+    <path d="M86 62 Q92 80 92 104 M80 70 Q84 86 84 106" stroke="#9e1f30" stroke-width=".7" fill="none" opacity=".3"/>
+    <!-- 手前の脚 -->
+    <path d="M49.5 66 L45.5 99" stroke="#f6d3c2" stroke-width="8.5" stroke-linecap="round"/>
+    <ellipse cx="51" cy="63.5" rx="7" ry="6.6" fill="#f8dccd"/>
+    <path d="M57 59 Q55 66 58 72" stroke="#a52234" stroke-width="3" fill="none" stroke-linecap="round" opacity=".55"/>
+    <rect x="41.2" y="92" width="8.6" height="7.2" rx="2" fill="#fafafa"/>
+    <path d="M37.5 98.5 h12.5 q3.4 0 3.4 4.4 v3.8 h-19.6 q-2.2 0 -1.8 -2.8 q.9 -5.4 5.5 -5.4 z" fill="#fdfdfd"/>
+    <path d="M32.6 106.4 h20.8" stroke="#d9d4d0" stroke-width="1.2"/>
+    <!-- 膝を抱える腕 -->
+    <path d="M80 60 Q74 80 51 85" stroke="url(#gKnit)" stroke-width="9.5" fill="none" stroke-linecap="round"/>
+    <path d="M51.5 80.6 Q49.4 85 51.5 89.4" stroke="#a52234" stroke-width="2.6" fill="none" stroke-linecap="round" opacity=".7"/>
+    <ellipse cx="45" cy="85" rx="3" ry="2.6" fill="#f6d3c2"/>
+    </g>
+    <!-- 頭（膝に顔をうずめ気味に、うつむいて目を閉じる） -->
+    <g transform="translate(55 58) scale(1.25) translate(-55 -58) rotate(-12 62 46)">
+      <circle cx="64" cy="42" r="17" fill="url(#gHair)"/>
+      <path d="M44 44 C44 34 52 29 59 30 C67 31 72 38 71 47 C70 56 64 61 57 61 C50 61 44 55 44 44 Z" fill="url(#gSkin)"/>
+      <ellipse cx="62.5" cy="53" rx="4.6" ry="2.8" fill="url(#gBlush)"/>
+      <ellipse cx="48" cy="53" rx="3" ry="2.2" fill="url(#gBlush)"/>
+      <path d="M61.6 52.4 l.8 -1.3 M63.6 52.6 l.8 -1.3" stroke="#f08c95" stroke-width=".55" stroke-linecap="round" opacity=".7"/>
+      <path d="M55 48.6 Q59 51.6 63.4 48.8" stroke="#21151a" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      <path d="M55.6 49.6 l-.8 1.4 M57.8 50.7 l-.4 1.5 M60.2 50.9 l0 1.5" stroke="#21151a" stroke-width=".7" stroke-linecap="round"/>
+      <path d="M45.6 48.8 Q48 50.8 50.6 49.2" stroke="#21151a" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+      <path d="M46.2 49.6 l-.6 1.2 M48.2 50.3 l-.3 1.3" stroke="#21151a" stroke-width=".6" stroke-linecap="round"/>
+      <path d="M61.4 51.6 C61.6 54.5 60.6 57 61.2 59 C61.8 60.8 63.6 60.2 63.4 58.4 C63.2 56 62.2 53.8 61.4 51.6 Z" fill="#cfeaff" opacity=".9"/>
+      <circle cx="62.1" cy="58.4" r=".55" fill="#fff"/>
+      <path d="M47.6 51.4 C47.2 53 47 54 47.3 55.2" stroke="#cfeaff" stroke-width=".9" fill="none" stroke-linecap="round" opacity=".8"/>
+      <path d="M56 43.8 Q59.5 42.6 63 43.8 M46.5 44 Q48.5 43 50.5 43.6" stroke="#7a5a50" stroke-width=".8" fill="none" stroke-linecap="round" opacity=".7"/>
+      <path d="M44.6 52.6 l-.9 .9" stroke="#e3a99a" stroke-width=".8" stroke-linecap="round"/>
+      <path d="M49.4 58 Q51 57.1 52.6 57.9" stroke="#c96f6a" stroke-width=".9" fill="none" stroke-linecap="round"/>
+      <path d="M43 46 C42 33 52 25 63 25 C74 25 82 32 81 43 C78 38 74 35 71 34 C71 39 69 42 66 44 C66 39 65 36 63 34 C61 39 58 42 54 43 C55 39 55 36 54 34 C50 37 46 41 43 46 Z" fill="url(#gHair)"/>
+      <path d="M73 36 C79 46 80 58 77 68 C74 60 72 50 70 44 Z" fill="url(#gHair)"/>
+      <path d="M52 28.5 Q63 24.5 74 29" stroke="#f3d6c8" stroke-width="1.8" fill="none" opacity=".35" stroke-linecap="round"/>
+      <rect x="70" y="30.5" width="8.5" height="2.1" rx="1" fill="#f7ead7" transform="rotate(-20 74 31.5)"/>
+    </g>
+  </svg>
+  <button id="skip">スキップ ›</button>
+  <div id="voice" class="hide"><span id="vt"></span><span class="next" id="vnext">▼</span></div>
+  <div id="chips"></div>
+  <div id="title">砂漠に種を蒔く<small>— sow a seed in the desert —</small></div>
+  <div id="tapHint">画面をタップ</div>
+  <div id="box">
+    <div id="name">おばあちゃん</div>
+    <div id="line"><span id="lt"></span><span class="next" id="lnext">▼</span></div>
+    <div id="end">
+      <button class="main" id="goLesson">おばあちゃんの初回講習へ</button>
+      <div id="note">試作はここまで。本番では、ここから初回講習（おばあちゃんの種に水やり）につながります。</div>
+      <button class="sub" id="replay">もう一度オープニングを見る</button>
+    </div>
+  </div>
+</div>
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const girlEl = document.getElementById('girl');
+const cv = $('cv'), ctx = cv.getContext('2d');
+const dk = document.createElement('canvas'), dctx = dk.getContext('2d');
+let W, H, DPR;
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+
+/* ---------- 状態 ---------- */
+const S = { girlY: .29, scene: 'dark', girlA: 0, orbA: 0, fallStart: 0, landStart: 0, choice: null };
+let stars = [], dust = [], sparks = [];
+
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  for (const c of [cv, dk]) { c.width = W * DPR; c.height = H * DPR; }
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  dctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  initStars(); initDust();
+}
+function initStars() {
+  stars = [];
+  for (let i = 0; i < 150; i++) stars.push({ x: Math.random() * W, y: Math.random() * H, z: .3 + Math.random() * 1.2, tw: Math.random() * 6.28 });
+}
+function initDust() {
+  dust = [];
+  for (let i = 0; i < 180; i++) dust.push({ x: Math.random() * W, y: Math.random() * H, l: 4 + Math.random() * 12, s: .6 + Math.random() * 1.4 });
+}
+addEventListener('resize', resize);
+
+/* ---------- 待機・中断のしくみ ---------- */
+const ABORT = Symbol('abort');
+const waits = new Set();
+let tapHandlers = [];
+function wait(fn) {
+  return new Promise((res, rej) => {
+    const w = { rej }; waits.add(w);
+    fn(v => { if (waits.has(w)) { waits.delete(w); res(v); } });
+  });
+}
+function cancelAll() { for (const w of waits) w.rej(ABORT); waits.clear(); tapHandlers = []; }
+const sleep = ms => wait(done => setTimeout(done, ms));
+const waitTap = () => wait(done => tapHandlers.push(done));
+$('stage').addEventListener('pointerdown', () => { const hs = tapHandlers; tapHandlers = []; hs.forEach(h => h()); });
+for (const id of ['skip', 'chips', 'end']) $(id).addEventListener('pointerdown', e => e.stopPropagation());
+
+const tweens = [];
+function tween(o, k, to, d) { tweens.push({ o, k, from: o[k], to, t0: performance.now(), d }); }
+function updTweens(now) {
+  for (let i = tweens.length - 1; i >= 0; i--) {
+    const t = tweens[i], x = Math.min(1, (now - t.t0) / t.d);
+    t.o[t.k] = t.from + (t.to - t.from) * (x * x * (3 - 2 * x));
+    if (x >= 1) tweens.splice(i, 1);
+  }
+}
+
+/* ---------- 文字送り ---------- */
+async function speak(textEl, nextEl, text, opt = {}) {
+  let ff = false; const h = () => { ff = true; };
+  tapHandlers.push(h);
+  nextEl.classList.remove('on');
+  for (let i = 1; i <= text.length; i++) {
+    if (ff) break;
+    textEl.textContent = text.slice(0, i);
+    await sleep(text[i - 1] === '…' ? 140 : 62);
+  }
+  tapHandlers = tapHandlers.filter(x => x !== h);
+  textEl.textContent = text;
+  if (opt.noWait) return;
+  await sleep(200);
+  nextEl.classList.add('on');
+  await waitTap();
+  nextEl.classList.remove('on');
+}
+const girlSay = (t, o) => speak($('vt'), $('vnext'), t, o);
+const grandmaSay = (t, o) => speak($('lt'), $('lnext'), t, o);
+
+/* ---------- 選択肢 ---------- */
+const OPTIONS = ['吃音', 'うつ', '不安・パニック', '摂食障害', '発達の特性', '介護', '子育て', '不登校・ひきこもり', '仕事', '人間関係', 'その他'];
+function prepareChips() {
+  const box = $('chips'), voice = $('voice');
+  box.innerHTML = '';
+  const all = [...OPTIONS.map(o => [o, o]), ['まだ、言葉にできない', 'none']];
+  all.forEach(([label, val]) => {
+    const b = document.createElement('button');
+    b.className = 'chip' + (val === 'none' ? ' wide' : '');
+    b.textContent = label; b.dataset.val = val;
+    box.appendChild(b);
+  });
+  // 選択肢のすぐ上に文字を置く
+  const top = box.getBoundingClientRect().top;
+  voice.style.top = 'auto';
+  voice.style.bottom = (H - top + 14) + 'px';
+  voice.style.minHeight = '0';
+  // 文字（2行ぶん）と重ならない位置まで女の子を上げる
+  const voiceTop = top - 14 - 70;
+  const girlCenter = voiceTop - 24 - 36;
+  const y = clamp(Math.min(.29, girlCenter / H), .1, .29);
+  if (y < S.girlY) tween(S, 'girlY', y, 900);
+}
+function choose() {
+  const box = $('chips');
+  return wait(done => {
+    [...box.children].forEach(b => {
+      const val = b.dataset.val;
+      b.onclick = () => {
+        if (box.dataset.locked) return; box.dataset.locked = '1';
+        [...box.children].forEach(c => c.classList.add(c === b ? 'picked' : 'dim'));
+        setTimeout(() => { box.classList.remove('on'); setTimeout(() => { delete box.dataset.locked; done(val); }, 500); }, 650);
+      };
+    });
+    requestAnimationFrame(() => box.classList.add('on'));
+  });
+}
+function girlReply(c) {
+  if (c === 'none') return ['うん。\n言葉にならなくても、いいよ。'];
+  if (c === 'その他') return ['うん。\n名前のない苦しさも、ちゃんと苦しさだよ。'];
+  return [`「${c}」……そっか。`, 'ずっと、ひとりで抱えてきたんだね。'];
+}
+function grandmaLines(c) {
+  const L = ['おや……。', 'お空から落ちてきたんかい。\nここに来る人は、みんなそうさ。', 'ここは、生きづらさの砂漠。\nひとりで歩くには、ちょいと風が強すぎる所でね。'];
+  if (c === 'none') L.push('言葉にならんもんを、抱えてきたんだねぇ。\nそれで、ええんよ。');
+  else if (c === 'その他') L.push('あんたにしか分からん苦労を、\n抱えてきたんだねぇ。');
+  else if (c) L.push(`${c}のことを、抱えてきたんだねぇ。\n……よう、ここまで来た。`);
+  L.push('まずは火にあたって、あったまりな。\n種の蒔き方は、それから教えてあげようね。');
+  return L;
+}
+
+/* ---------- 流れ ---------- */
+async function opening() {
+  try {
+    S.scene = 'dark'; S.girlA = 0; S.orbA = 0; S.choice = null;
+    await sleep(900);
+    tween(S, 'girlA', 1, 2400);
+    await sleep(2200);
+    $('voice').classList.remove('hide');
+    await girlSay('ここは、暗闇……');
+    await girlSay('何もない、孤独な場所……');
+    $('vt').textContent = '';
+    prepareChips();
+    await sleep(500);
+    await girlSay('あなたが抱える\n生きづらさは、ありますか？', { noWait: true });
+    const c = await choose();
+    S.choice = c;
+    try { localStorage.setItem('sabaku.interest', c); } catch (e) {}
+    await sleep(400);
+    for (const l of girlReply(c)) await girlSay(l);
+    await girlSay('この下にはね、何かを抱えた人たちが\nひとりずつ、種を蒔いている場所があるの。');
+    $('voice').classList.add('hide');
+    tween(S, 'girlA', 0, 700);
+    tween(S, 'orbA', 1, 500);
+    await sleep(750);
+    await fall();
+    await land();
+  } catch (e) { if (e !== ABORT) console.error(e); }
+}
+async function fall() {
+  S.scene = 'fall'; S.fallPhase = 'cruise'; S.fallStart = performance.now();
+  await sleep(4500); $('title').classList.add('on');
+  await sleep(2000); $('tapHint').classList.add('on');
+  await waitTap();
+  $('tapHint').classList.remove('on'); $('title').classList.remove('on');
+  S.fallPhase = 'descend'; S.descStart = performance.now();
+  await sleep(3400);
+}
+async function land() {
+  $('skip').classList.add('hide');
+  $('voice').classList.add('hide'); $('chips').classList.remove('on'); $('title').classList.remove('on'); $('tapHint').classList.remove('on');
+  S.orbA = 1; S.scene = 'land'; S.landStart = performance.now();
+  await sleep(1900);
+  $('box').classList.add('on');
+  const L = grandmaLines(S.choice);
+  for (let i = 0; i < L.length; i++) await grandmaSay(L[i], { noWait: i === L.length - 1 });
+  $('end').classList.add('on');
+}
+$('skip').onclick = () => {
+  if (S.scene === 'land') return;
+  cancelAll();
+  land().catch(e => { if (e !== ABORT) console.error(e); });
+};
+$('goLesson').onclick = () => { $('note').style.display = 'block'; };
+$('replay').onclick = () => {
+  cancelAll(); tweens.length = 0;
+  $('box').classList.remove('on'); $('end').classList.remove('on'); $('note').style.display = 'none';
+  $('lt').textContent = ''; $('vt').textContent = '';
+  S.girlY = .29; const v = $('voice'); v.style.top = ''; v.style.bottom = ''; v.style.minHeight = '';
+  $('skip').classList.remove('hide');
+  initStars();
+  opening();
+};
+
+/* ---------- ドット絵 ---------- */
+const GIRL = [
+  "....hhhh....", "..hhhhhhhh..", ".hhhhhhhhhh.", ".hhffffffhh.", ".hfeffffefh.", ".hffffffffh.",
+  ".hhffmmffhh.", ".hh.ffff.hh.", ".h.dddddd.h.", "..dddddddd..", ".fddddddddf.", ".fddddddddf.",
+  "..dddddddd..", "..dddddddd..", "...ff..ff...", "...ss..ss..."];
+const GIRL_PAL = { h: '#2f2433', f: '#f6dcc6', e: '#2a1f1f', m: '#d98c8c', d: '#f1eeff', s: '#6b5b8a' };
+const GRAN = [
+  "...gggggg...", "..gggggggg..", "..gffffffg..", "..fefffeff..", "..ffffffff..", "...ffmmff...",
+  "..pppppppp..", ".pppppppppp.", ".ppwppppwpp.", ".fppppppppf.", ".pppppppppp.", ".pppppppppp.",
+  "..pppppppp..", "...bb..bb..."];
+const GRAN_PAL = { g: '#dcd6cc', f: '#f0cfb2', e: '#3a2c24', m: '#c98a7a', p: '#7a5c8a', w: '#a885b5', b: '#4a3a32' };
+function sprite(rows, pal, x, y, q, a = 1) {
+  ctx.globalAlpha = a;
+  rows.forEach((row, j) => {
+    for (let i = 0; i < row.length; i++) {
+      const c = pal[row[i]]; if (!c) continue;
+      ctx.fillStyle = c;
+      ctx.fillRect(Math.round(x + i * q), Math.round(y + j * q), Math.ceil(q), Math.ceil(q));
+    }
+  });
+  ctx.globalAlpha = 1;
+}
+function orb(x, y, r, a = 1) {
+  if (a <= 0) return;
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r * 5);
+  g.addColorStop(0, `rgba(255,255,255,${a})`);
+  g.addColorStop(.14, `rgba(255,244,210,${.85 * a})`);
+  g.addColorStop(.42, `rgba(255,205,130,${.22 * a})`);
+  g.addColorStop(1, 'rgba(255,205,130,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r * 5, 0, 7); ctx.fill();
+}
+const R = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), Math.max(1, Math.round(w)), Math.max(1, Math.round(h))); };
+
+/* ---------- 場面1：暗闇 ---------- */
+function drawDark(now) {
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+  for (let i = 0; i < 45; i++) {
+    const s = stars[i], a = .04 + .12 * (.5 + .5 * Math.sin(now / 900 + s.tw));
+    ctx.fillStyle = `rgba(200,210,255,${a})`; ctx.fillRect(s.x, s.y, 1.3, 1.3);
+  }
+  const q = Math.max(4, Math.round(Math.min(W, H) / 68));
+  const gx = W / 2, gy = H * S.girlY + Math.sin(now / 1300) * q * .4;
+  if (S.girlA > 0.01) {
+    const g = ctx.createRadialGradient(gx, gy, 0, gx, gy, q * 16);
+    g.addColorStop(0, `rgba(190,180,230,${.13 * S.girlA})`); g.addColorStop(1, 'rgba(170,180,255,0)');
+    ctx.fillStyle = g; ctx.fillRect(gx - q * 16, gy - q * 16, q * 32, q * 32);
+  }
+  girlEl.style.opacity = S.girlA;
+  girlEl.style.top = (S.girlY * 100) + '%';
+  girlEl.style.transform = `translate(-50%, calc(-50% + ${Math.sin(now / 1300) * 2}px))`;
+  orb(W / 2, H * S.girlY + 10 + (1 - S.orbA) * q * 3, 5, S.orbA);
+}
+
+/* ---------- 場面2：落下 ---------- */
+function drawFall(now, dt) {
+  const e = (now - S.fallStart) / 1000;
+  let v, k = 0, d = -1;
+  if (S.fallPhase !== 'descend') v = e < 1.3 ? (e / 1.3) ** 2 : 1;
+  else {
+    d = (now - S.descStart) / 1000;
+    v = Math.max(.12, 1 - d / 2.8 * .88);
+    k = clamp(d / 3, 0, 1);
+  }
+  ctx.fillStyle = `rgb(${Math.round(14 * k)},${Math.round(20 * k)},${Math.round(51 * k)})`;
+  ctx.fillRect(0, 0, W, H);
+  const dx = .28, dy = .96;
+  ctx.lineCap = 'round';
+  for (const s of stars) {
+    s.x -= dx * v * s.z * dt * 1100; s.y -= dy * v * s.z * dt * 1100;
+    if (s.y < -80) { s.y = H + Math.random() * 60; s.x = Math.random() * (W + 200) - 60; }
+    if (s.x < -80) s.x += W + 140;
+    const len = v * s.z * s.z * 45 + 1.5;
+    ctx.strokeStyle = `rgba(220,228,255,${.15 + .5 * (s.z / 1.5) ** 2})`;
+    ctx.lineWidth = Math.max(.6, s.z * 1.1);
+    ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x + dx * len, s.y + dy * len); ctx.stroke();
+  }
+  // 遠くに見えてくる焚き火の灯り
+  if (d >= 0) {
+    const t = clamp((d - .2) / 3, 0, 1);
+    const fy = H * 1.15 - t * (H * 1.15 - H * .72), fx = W / 2 + 20 * (1 - t);
+    const r = 4 + t * 34;
+    const g = ctx.createRadialGradient(fx, fy, 0, fx, fy, r);
+    g.addColorStop(0, `rgba(255,190,90,${.9 * t})`); g.addColorStop(1, 'rgba(255,140,40,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(fx, fy, r, 0, 7); ctx.fill();
+  }
+  // 流れ星になった「あなた」
+  const ox = W / 2 + Math.sin(now / 400) * 2, oy = H * S.girlY + 10 + (1 - (1 - clamp((e - .4) / 3.6, 0, 1)) ** 2) * (H * .5 - H * S.girlY - 10);
+  const tl = 30 + v * 190;
+  const g = ctx.createLinearGradient(ox, oy, ox - dx * tl, oy - dy * tl);
+  g.addColorStop(0, 'rgba(255,245,215,.9)'); g.addColorStop(1, 'rgba(255,220,160,0)');
+  ctx.strokeStyle = g; ctx.lineWidth = 6;
+  ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ox - dx * tl, oy - dy * tl); ctx.stroke();
+  orb(ox, oy, 5, 1);
+}
+
+/* ---------- 場面3：焚き火の村 ---------- */
+function hash(i, j) { const x = Math.sin(i * 127.1 + j * 311.7) * 43758.5453; return x - Math.floor(x); }
+function hole(x, y, r, a) {
+  const g = dctx.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, `rgba(0,0,0,${a})`); g.addColorStop(.45, `rgba(0,0,0,${a * .75})`); g.addColorStop(1, 'rgba(0,0,0,0)');
+  dctx.fillStyle = g; dctx.beginPath(); dctx.arc(x, y, r, 0, 7); dctx.fill();
+}
+function drawLand(now, dt) {
+  const e = (now - S.landStart) / 1000;
+  const T = Math.round(Math.min(W / 9, H / 12)), p = T / 16;
+  const cx = W / 2, cy = H * .38;
+  // 地面
+  const i0 = -Math.ceil(cx / T) - 1, i1 = Math.ceil((W - cx) / T) + 1;
+  const j0 = -Math.ceil(cy / T) - 1, j1 = Math.ceil((H - cy) / T) + 1;
+  for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+    const x = cx - T / 2 + i * T, y = cy - T / 2 + j * T, r = hash(i, j);
+    const green = i * i + j * j <= 5;
+    if (green) {
+      ctx.fillStyle = `hsl(100,34%,${46 + (r - .5) * 6}%)`;
+      ctx.fillRect(Math.floor(x), Math.floor(y), T + 1, T + 1);
+      R(x + T * (.2 + r * .4), y + T * .3, p, 2 * p, 'hsl(100,38%,36%)');
+      R(x + T * (.25 + r * .4), y + T * .25, p, 3 * p, 'hsl(100,38%,36%)');
+      if (r > .6) R(x + T * .65, y + T * .7, p, 2 * p, 'hsl(100,38%,38%)');
+    } else {
+      ctx.fillStyle = `hsl(38,52%,${70 + (r - .5) * 6}%)`;
+      ctx.fillRect(Math.floor(x), Math.floor(y), T + 1, T + 1);
+      if (r > .55) R(x + T * r * .7, y + T * ((r * 7) % 1) * .7, 1.5 * p, p, 'hsl(36,45%,60%)');
+    }
+  }
+  // 家
+  const hx = cx, hy = cy - .55 * T;
+  R(hx - 7 * p, hy, 14 * p, 1.5 * p, 'rgba(0,0,0,.18)');
+  R(hx - 7 * p, hy - 9 * p, 14 * p, 9 * p, '#efe0bf');
+  R(hx - 7 * p, hy - 1 * p, 14 * p, 1 * p, '#d6c098');
+  R(hx - 5 * p, hy - 7 * p, 4 * p, 3 * p, '#ffd27a');
+  R(hx + 1 * p, hy - 6 * p, 3.5 * p, 6 * p, '#7a5236');
+  R(hx + 3.5 * p, hy - 17.5 * p, 2 * p, 3 * p, '#8e3e2e');
+  R(hx - 8.5 * p, hy - 13 * p, 17 * p, 4.5 * p, '#b5543f');
+  R(hx - 8.5 * p, hy - 9.5 * p, 17 * p, 1 * p, '#8e3e2e');
+  R(hx - 6.5 * p, hy - 15 * p, 13 * p, 2 * p, '#c4644c');
+  R(hx - 4 * p, hy - 16 * p, 8 * p, 1 * p, '#c4644c');
+  // 焚き火（石と薪）
+  const fx = cx, fy = cy + .3 * T;
+  for (let a = 0; a < 8; a++) {
+    const ang = a / 8 * Math.PI * 2;
+    R(fx + Math.cos(ang) * 5 * p - p, fy + Math.sin(ang) * 2.2 * p - p, 2 * p, 1.6 * p, '#8d8578');
+  }
+  R(fx - 4 * p, fy - 1 * p, 8 * p, 1.5 * p, '#5a3a24');
+  R(fx - 3 * p, fy - 2 * p, 6 * p, 1.2 * p, '#6b4630');
+  // おばあちゃん
+  const q = T / 14;
+  sprite(GRAN, GRAN_PAL, cx - 1.5 * T - 6 * q, fy + .2 * T - 14 * q, q);
+
+  // 夜の暗さ（焚き火・窓・あなたの光だけ明るい）
+  const flick = 1 + .05 * Math.sin(now / 80) + .03 * Math.sin(now / 31);
+  const ox = cx + 1.35 * T, oy = fy - .25 * T + Math.sin(now / 700) * p;
+  dctx.globalCompositeOperation = 'source-over';
+  dctx.clearRect(0, 0, W, H);
+  dctx.fillStyle = 'rgba(6,8,28,.84)'; dctx.fillRect(0, 0, W, H);
+  dctx.globalCompositeOperation = 'destination-out';
+  hole(fx, fy - 3 * p, T * 2.9 * flick, 1);
+  hole(hx - 3 * p, hy - 5.5 * p, T * .9, .55);
+  hole(ox, oy, T * 1.1, .55);
+  ctx.drawImage(dk, 0, 0, W, H);
+
+  // 暖かい光
+  ctx.globalCompositeOperation = 'lighter';
+  let g = ctx.createRadialGradient(fx, fy - 3 * p, 0, fx, fy - 3 * p, T * 2.2 * flick);
+  g.addColorStop(0, 'rgba(255,140,40,.32)'); g.addColorStop(1, 'rgba(255,140,40,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  g = ctx.createRadialGradient(hx - 3 * p, hy - 5.5 * p, 0, hx - 3 * p, hy - 5.5 * p, T * .7);
+  g.addColorStop(0, 'rgba(255,200,110,.25)'); g.addColorStop(1, 'rgba(255,200,110,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  ctx.globalCompositeOperation = 'source-over';
+
+  // 炎
+  for (let c = -3; c <= 2; c++) {
+    const hgt = (6.5 - Math.abs(c + .5) * 1.5) + Math.sin(now / 90 + c * 1.7) * 1.3 + Math.sin(now / 53 + c) * .8;
+    for (let k = 0; k < hgt; k++) {
+      const t = k / hgt;
+      const col = (Math.abs(c + .5) < 1.2 && t < .55) ? '#fff1b8' : t < .8 ? '#ffb238' : '#ff6b1a';
+      R(fx + c * p, fy - 2 * p - (k + 1) * p, p, p, col);
+    }
+  }
+  // 火の粉
+  if (Math.random() < .12) sparks.push({ x: fx + (Math.random() - .5) * 4 * p, y: fy - 6 * p, vy: -(20 + Math.random() * 30), vx: (Math.random() - .5) * 10, life: 1 });
+  ctx.globalCompositeOperation = 'lighter';
+  for (let i = sparks.length - 1; i >= 0; i--) {
+    const s = sparks[i];
+    s.x += s.vx * dt + Math.sin(now / 200 + i) * .2; s.y += s.vy * dt; s.life -= dt * .7;
+    if (s.life <= 0) { sparks.splice(i, 1); continue; }
+    ctx.fillStyle = `rgba(255,190,90,${s.life})`; ctx.fillRect(s.x, s.y, Math.max(1, p * .6), Math.max(1, p * .6));
+  }
+  ctx.globalCompositeOperation = 'source-over';
+
+  // 遠くの砂嵐
+  const R0 = 3.4 * T;
+  for (const d of dust) {
+    d.x += d.s * dt * 90; d.y += Math.sin(now / 600 + d.l) * .15;
+    if (d.x > W + 20) { d.x = -20; d.y = Math.random() * H; }
+    const dist = Math.hypot(d.x - cx, d.y - cy);
+    const a = clamp((dist - R0) / (2.5 * T), 0, 1) * .35;
+    if (a <= 0) continue;
+    ctx.fillStyle = `rgba(190,160,120,${a})`; ctx.fillRect(d.x, d.y, d.l, 1.2);
+  }
+  g = ctx.createRadialGradient(cx, cy, R0, cx, cy, Math.hypot(W, H) * .6);
+  g.addColorStop(0, 'rgba(60,50,45,0)'); g.addColorStop(1, 'rgba(60,50,45,.6)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+  // 着地した「あなた」の光
+  orb(ox, oy, 4, .9);
+
+  // 着地の閃光
+  const flash = clamp(1 - e / 1.4, 0, 1);
+  if (flash > 0) { ctx.fillStyle = `rgba(255,250,235,${flash})`; ctx.fillRect(0, 0, W, H); }
+}
+
+/* ---------- ループ ---------- */
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  updTweens(now);
+  if (S.scene !== 'dark') girlEl.style.opacity = 0;
+  if (S.scene === 'dark') drawDark(now);
+  else if (S.scene === 'fall') drawFall(now, dt);
+  else drawLand(now, dt);
+  requestAnimationFrame(frame);
+}
+resize();
+requestAnimationFrame(frame);
+opening();
+})();
+</script>
+</body>
+</html>
