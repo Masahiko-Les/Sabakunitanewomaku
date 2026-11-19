@@ -66,7 +66,7 @@ const HTML = `<div id="stage">
   <button id="skip">スキップ ›</button>
   <div id="voice" class="hide"><span id="vt"></span><span class="next" id="vnext">▼</span></div>
   <div id="chips"></div>
-  <div id="title">砂漠に種を蒔く<small>— sow a seed in the desert —</small></div>
+  <div id="title">砂漠に種を蒔く<small>— sow seeds in the desert —</small></div>
   <div id="tapHint">画面をタップ</div>
 </div>`;
 
