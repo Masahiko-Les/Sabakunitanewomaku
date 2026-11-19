@@ -26,6 +26,7 @@ addEventListener('resize',resize);resize();
 // オープニング（初回のみ。INTEGRATION.md）。見たかどうかがわかるまで、地図を黒い幕で覆っておく。?opening=1 で強制表示
 const OPEN_KEY='sabaku.openingSeen',INTEREST_KEY='sabaku.interest';
 const forceOpening=new URLSearchParams(location.search).get('opening')==='1';
+if(forceOpening)try{history.replaceState(null,'',location.pathname)}catch(e){}
 let openingEl=null;
 try{if(forceOpening||localStorage.getItem(OPEN_KEY)!=='1'){openingEl=document.createElement('div');openingEl.id='opening';document.body.appendChild(openingEl)}}catch(e){}
 
@@ -302,7 +303,7 @@ function draw(t){ctx.setTransform(dpr,0,0,dpr,0,0);ctx.globalCompositeOperation=
  ctx.globalAlpha=.55;ctx.drawImage(stormC,cam.x/TILE+Math.sin(t/700)*.35,cam.y/TILE+Math.cos(t/900)*.25,vw/TILE,vh/TILE,0,0,vw,vh);ctx.globalAlpha=1;
  ctx.lineWidth=1.2;ctx.lineCap='round';
  for(const p of dust){const st=stormAt(p.x+cam.x,p.y+cam.y);if(st<.15)continue;ctx.strokeStyle=`rgba(255,244,225,${.5*st})`;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x-p.len,p.y-p.len*.28);ctx.stroke()}
- const flick=1+.07*Math.sin(t/80)+.05*Math.sin(t/31)+.03*Math.sin(t/13);
+ const flick=1+.025*Math.sin(t/1100)+.015*Math.sin(t/430);
  if(night>.01){
   dctx.setTransform(dpr,0,0,dpr,0,0);dctx.globalCompositeOperation='source-over';dctx.clearRect(0,0,vw,vh);
   dctx.fillStyle=`rgba(5,7,22,${.93*night})`;dctx.fillRect(0,0,vw,vh);
@@ -375,7 +376,7 @@ $('#btnPlant').onclick=()=>{if(!ready)return;const pi=plantState();if(!pi.ok)ret
 const stageText={seed:'まだ、水を待っています',sprout:'芽が出ています',flower:'花が咲いています'};
 function openSeed(s){if(s.mine)return openMine(s);if(s.granny)return openGrannySeed(s);
  const mine=myLetter(s);
- let body=`<div class="kicker">誰かの種</div><p class="slabel">生きづらさ：</p><p class="hard">${esc(s.h)}</p><p class="slabel">それにどう向き合っているか：</p><p class="face">${esc(s.f)}</p><p class="state">${stageText[stageOf(s)]}</p>`;
+ let body=`<div class="kicker">誰かの種</div><div class="parchment"><p class="slabel">生きづらさ：</p><p class="hard">${esc(s.h)}</p><p class="slabel">それにどう向き合っているか：</p><p class="face">${esc(s.f)}</p></div><p class="state">${stageText[stageOf(s)]}</p>`;
  if(!mine&&(S.tutorial||0)<3){body+=`<p class="note">水やりは、焚き火のそばのおばあちゃんに教わってからにしよう。</p><div class="row"><button class="btn soft small" id="x">閉じる</button></div>`}
  else if(!mine){body+=`<label>優しい言葉の手紙で、水をあげる（10行まで）</label><textarea id="tL" rows="5" maxlength="300" placeholder="アドバイスより、まずは受けとめる言葉を"></textarea><div class="count" id="cL"></div>
   <p class="note">手紙は、この種を蒔いた人にだけ届きます。ほかの人には見えません。</p>
@@ -398,7 +399,7 @@ function openMine(s){
  const self=s.letters.find(l=>l.from==='me');
  const letters=s.letters.map(l=>`<div class="letter"><div class="from">${l.from==='me'?'自分から自分への手紙':'誰かからの手紙'}</div><div class="txt">${esc(l.text)}</div>
   <div class="act">${FB&&l.from!=='me'?`<button class="btn ghost small" data-rep="${l.id}" style="margin-right:auto;padding-left:0">この手紙を知らせる</button>`:''}${l.thanked?'ありがとうを返しました':expired(s)?'':`<button class="btn main small" data-thx="${l.id}">ありがとう</button>`}</div></div>`).join('');
- const body=`<div class="kicker">あなたの種</div><p class="slabel">生きづらさ：</p><p class="hard">${esc(s.h)}</p><p class="slabel">それにどう向き合っているか：</p><p class="face">${esc(s.f)}</p>
+ const body=`<div class="kicker">あなたの種</div><div class="parchment"><p class="slabel">生きづらさ：</p><p class="hard">${esc(s.h)}</p><p class="slabel">それにどう向き合っているか：</p><p class="face">${esc(s.f)}</p></div>
  <p class="state">${s.hidden?'この種は、ほかの人には見えない場所に置いてあります':stageText[stageOf(s)]}</p>
  ${s.letters.length?`<div class="sec">届いた手紙</div>${letters}`:`<p class="empty">まだ手紙は届いていません。誰かが通りかかるのを、静かに待っています。</p>`}
  ${self||expired(s)?'':`<div id="selfWrap"><div class="row" style="justify-content:flex-start"><button class="btn ghost small" id="selfBtn" style="padding-left:0">自分に、手紙を書く</button></div></div>`}
@@ -506,7 +507,7 @@ function grannyThanks(){talkSheet(({play,button})=>play(TUT.reading,()=>button('
  closeSheet();if(g)bloom(g);
  setTimeout(()=>talkSheet(({play,button})=>play(TUT.finish,()=>button('はじめる',finishTutorial))),3200)})))}
 function openGrannySeed(s){const mine=myLetter(s),tu=S.tutorial||0;
- let body=`<div class="kicker">おばあちゃんの種</div><p class="slabel">生きづらさ：</p><p class="hard">${esc(s.h)}</p><p class="slabel">それにどう向き合っているか：</p><p class="face">${esc(s.f)}</p>`;
+ let body=`<div class="kicker">おばあちゃんの種</div><div class="parchment"><p class="slabel">生きづらさ：</p><p class="hard">${esc(s.h)}</p><p class="slabel">それにどう向き合っているか：</p><p class="face">${esc(s.f)}</p></div>`;
  if(!mine&&tu>=1){body+=`<div class="care" style="font-size:13.5px;line-height:1.95"><b style="font-weight:500">水やりのこつ</b><br>・まずは、気持ちを受けとめる<br>　（「それは、さみしいですね」）<br>・向き合い方の、よいところを伝える<br>　（「その考え方、すてきです」）<br>・アドバイスは、しなくて大丈夫</div>
   <label>やさしい言葉の手紙で、水をあげる（10行まで）</label><textarea id="tL" rows="5" maxlength="300" placeholder="たとえば：できることを数えるって、すてきですね。"></textarea><div class="count" id="cL"></div>
   <div class="row"><button class="btn ghost small" id="x">閉じる</button><button class="btn main small" id="ok" disabled>水をあげる</button></div>`}
@@ -543,6 +544,7 @@ function openSettings(){
  const seg=[['auto','時刻に合わせる'],['day','昼'],['night','夜']].map(([k,t])=>`<button data-sky="${k}"${k===skyMode()?' class="on"':''}>${t}</button>`).join('');
  openSheet(`<div class="settings"><div class="kicker">設定</div><h2>設定</h2>
  <button class="list-item go" id="sHelp">この世界について</button>
+ <button class="list-item go" id="sOpening">オープニングをもう一度見る</button>
  <label>昼と夜</label><div class="seg">${seg}</div>
  <div class="gap"></div><button class="list-item go" id="sCare">困ったときの相談先</button>
  <label>データについて</label><p class="data">名前や連絡先は保存しません。種と手紙は、このブラウザに結びついた記録として保存されます。ブラウザのデータを消したり、別の端末で開いたりすると、自分の世界には戻れません。</p>
@@ -551,6 +553,7 @@ function openSettings(){
  <div class="row"><button class="btn main small" id="x">閉じる</button></div></div>`,el=>{
   el.querySelector('#x').onclick=closeSheet;
   el.querySelector('#sHelp').onclick=openHelp;
+  el.querySelector('#sOpening').onclick=()=>{location.href=location.pathname+'?opening=1'};
   el.querySelector('#sCare').onclick=openCare;
   el.querySelectorAll('[data-sky]').forEach(b=>b.onclick=()=>{setSky(b.dataset.sky);el.querySelectorAll('[data-sky]').forEach(x=>x.classList.toggle('on',x===b))});
   const r=el.querySelector('#rst');r.onclick=async()=>{if(!r.dataset.c){r.dataset.c=1;r.textContent='本当に消す';return}

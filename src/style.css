@@ -79,3 +79,17 @@ textarea:focus{border-color:#e0b48e}
 .seg{display:flex;gap:6px}
 .seg button{flex:1;font:inherit;font-size:13.5px;padding:10px 0;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer;transition:background .2s,color .2s}
 .seg button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+/* 種の本文：生きづらさと向き合い方を、1 枚の羊皮紙の手紙に */
+.parchment{position:relative;margin:2px 0 16px;padding:20px 20px 8px;border-radius:6px;
+ background:
+  radial-gradient(ellipse at 50% 45%,rgba(255,248,226,0) 55%,rgba(176,128,66,.20) 100%),
+  radial-gradient(circle at 18% 22%,rgba(196,150,86,.10) 0,rgba(196,150,86,0) 38%),
+  radial-gradient(circle at 82% 78%,rgba(196,150,86,.12) 0,rgba(196,150,86,0) 42%),
+  linear-gradient(172deg,#f8ecd0 0%,#f3e1bd 55%,#eed6aa 100%);
+ border:1px solid rgba(170,124,64,.28);
+ box-shadow:0 1px 0 rgba(255,255,255,.6) inset,0 0 18px rgba(150,100,40,.10) inset,0 4px 14px rgba(120,80,40,.14)}
+.parchment::before,.parchment::after{content:'';position:absolute;left:14px;right:14px;height:1px;background:rgba(150,104,48,.22)}
+.parchment::before{top:9px}.parchment::after{bottom:7px}
+.parchment .slabel{color:#93754f}
+.parchment .hard{color:#4a3622}
+.parchment .face{border-left:none;padding-left:0;color:#5a4329}
