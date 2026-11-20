@@ -488,18 +488,23 @@ function openMine(s){
  const body=`<div class="kicker">あなたの種</div>${seedCard(s)}
  <p class="state">${s.hidden?'この種は、ほかの人には見えない場所に置いてあります':stageText[stageOf(s)]}</p>
  ${s.letters.length?`<div class="sec">届いた手紙</div>${letters}`:`<p class="empty">まだ水やりされていません。誰かが通りかかるのを、静かに待っています。</p>`}
- <div class="row" style="justify-content:flex-start;margin-top:8px"><button class="btn ghost small" id="pull" style="padding-left:0">抜く</button></div>
+ <div class="row" style="justify-content:flex-start;margin-top:8px"><button class="btn ghost small" id="pull" style="padding-left:0">種を抜く</button></div>
  <div class="row"><button class="btn soft small" id="x">閉じる</button></div>`;
  markSeen(s);
  openSheet(body,el=>{el.querySelector('#x').onclick=closeSheet;
-  // 抜く：1 回目で「本当に抜く」、もう一度押すと、みんなの世界から消す
-  const pl=el.querySelector('#pull');pl.onclick=()=>{if(!pl.dataset.c){pl.dataset.c=1;pl.textContent='本当に抜く';return}
-   if(pl.dataset.busy)return;pl.dataset.busy=1;
-   stopWatch(s.id);if(FB)pullSeed(s.id);S.seeds=S.seeds.filter(z=>z!==s);save();rebuildWorld();refreshDot();closeSheet();toast('種を抜きました')};
+  el.querySelector('#pull').onclick=()=>confirmPull(s);
   el.querySelectorAll('[data-rep]').forEach(b=>b.onclick=()=>{if(!b.dataset.c){b.dataset.c=1;b.textContent='本当に知らせる';return}
    const w=b.dataset.rep;MUTED[s.id+'_'+w]=true;reportLetter(s.id,w);s.letters=s.letters.filter(z=>z.id!==w);save();rebuildWorld();refreshDot();openMine(s);toast('知らせました。この手紙は、もう表示されません')});
   el.querySelectorAll('[data-thx]').forEach(b=>b.onclick=()=>{const l=s.letters.find(z=>z.id===b.dataset.thx);if(!l)return;l.thanked=true;l.thankedAt=Date.now();save();thankLetter(s.id,l.id);
    b.parentElement.textContent='ありがとうを返しました';if(!s.hidden){bloom(s);setTimeout(closeSheet,500)}});})}
+
+// 種を抜く：確認してから、みんなの世界から消す（やめておくと、自分の種のシートに戻る）
+function confirmPull(s){openSheet(`<h2>この種を抜きますか？</h2>
+ <p class="empty">ほかの人の砂漠に届いた種も、いっしょに消えます。<br>届いた手紙も、読めなくなります。<br>抜いた種は、もとに戻せません。</p>
+ <div class="row"><button class="btn ghost small" id="pNo">やめておく</button><button class="btn main small" id="pYes">抜く</button></div>`,el=>{
+  el.querySelector('#pNo').onclick=()=>openMine(s);
+  const y=el.querySelector('#pYes');y.onclick=()=>{if(y.dataset.busy)return;y.dataset.busy=1;
+   stopWatch(s.id);if(FB)pullSeed(s.id);S.seeds=S.seeds.filter(z=>z!==s);save();rebuildWorld();refreshDot();closeSheet();toast('種を抜きました')}})}
 
 /* ---------- my seeds list ---------- */
 function goTo(s){const cx=(s.x+.5)*TILE,cy=(s.y+.5)*TILE;P.x=cx-TILE;P.y=cy-10;if(solid(P.x,P.y+10))P.x=cx+TILE;
