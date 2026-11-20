@@ -118,7 +118,7 @@ await page.waitForTimeout(800);
 d = await userDoc(uid);
 check(d.tutorial === 3, `tutorial=3（講習完了）`);
 // 締めの会話のあと：風に乗って、全員共通の練習の種 3 つが飛んでくる →「ほら風に乗って…」
-await waitText('ほら砂風に乗って、種が飛んできたよ。優しい言葉で水やりしてみておくれ。');
+await waitText('ほら砂風に乗って、種が飛んできたよ。やさしい言葉で水やりしてみておくれ。');
 await page.screenshot({ path: `${OUT}/p2_3b_practice.png` });
 d = await userDoc(uid);
 const dm = Object.keys(d.dummies?.mapValue?.fields || {}).sort();

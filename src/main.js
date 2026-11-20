@@ -491,9 +491,9 @@ function drawGust(t){if(!gust)return;const I=gust.I;
 const stageText={seed:'まだ、水を待っています',sprout:'芽が出ています',flower:'花が咲いています'};
 function openSeed(s){if(s.mine)return openMine(s);if(s.granny)return openGrannySeed(s);
  const mine=myLetter(s);
- let body=`<div class="kicker seedk">${SEED_ICON}誰かの種</div>${seedCard(s)}<p class="state">${stageText[stageOf(s)]}</p>`;
+ let body=`<div class="kicker seedk">${SEED_ICON}誰かの種</div>${seedCard(s)}${stageOf(s)==='seed'?'':`<p class="state">${stageText[stageOf(s)]}</p>`}`; // 誰かの種：まだ種のときは、状態を書かない
  if(!mine&&(S.tutorial||0)<3){body+=`<p class="note">水やりは、焚き火のそばのおばあちゃんに教わってからにしよう。</p><div class="row"><button class="btn soft small" id="x">閉じる</button></div>`}
- else if(!mine){body+=`<label class="wlabel">${CAN_ICON}優しい言葉で、水をあげる（10行まで）</label><textarea id="tL" rows="5" maxlength="300" placeholder="アドバイスより、まずは受けとめる言葉を"></textarea><div class="count" id="cL"></div>
+ else if(!mine){body+=`<label class="wlabel">${CAN_ICON}やさしい言葉で、水をあげる（10行まで）</label><textarea id="tL" rows="5" maxlength="300" placeholder="アドバイスより、まずは受けとめる言葉を"></textarea><div class="count" id="cL"></div>
   ${s.sample?'':'<p class="note">手紙は、この種を蒔いた人にだけ届きます。ほかの人には見えません。</p>'}
   <div class="row"><button class="btn ghost small" id="x">閉じる</button><button class="btn main small" id="ok" disabled>水をあげる</button></div>`}
  else{body+=`<div class="letter"><div class="from">あなたが届けた手紙</div><div class="txt">${esc(mine.text)}</div></div>
@@ -603,7 +603,7 @@ const TUT={
   'じつはね、わたしも種を蒔いてあるんだよ。ほら、わたしのすぐそばの、左のところさ。',
   '水やりのこつは「アドバイスより、共感」。「こうしたら？」より、「それはさみしいね」「その考え方、すてきだね」って、受けとめる言葉をかけてあげることさ。',
   'うまく書こうとしなくていいからね。わたしの種を読んで、やさしい言葉で水をあげてみておくれ。'],
- practice:['ほら砂風に乗って、種が飛んできたよ。優しい言葉で水やりしてみておくれ。'],
+ practice:['ほら砂風に乗って、種が飛んできたよ。やさしい言葉で水やりしてみておくれ。'],
  remind:['わたしの種は、すぐそばの左のところだよ。','アドバイスより、共感。受けとめる言葉で、水をあげてみておくれ。'],
  reading:['（おばあちゃんが、あなたの言葉をゆっくり読んでいる……）','……ありがとうねぇ。あったかい言葉だった。','こんなふうに言ってもらえると、明日もまた薪をくべようって思えるよ。','じゃあ、わたしからも「ありがとう」を返そうね。'],
  finish:['ほら、咲いたねぇ。まわりの砂も、少し緑になっただろう？','あんたの言葉で、この砂漠がひとつ、生きやすくなったんだよ。','こんどは、あんたの番だ。緑の上に立って、あんたの生きづらさを種にして蒔いてごらん。','あんたの種も、どこかの誰かの砂漠に届いて、きっと誰かが水をあげてくれるからね。','書き方に迷ったら、いつでもわたしに聞きにおいで。']};
@@ -650,7 +650,7 @@ function openGranny(){target=null;const tu=S.tutorial||0;
 function openHelp(){openSheet(`<div class="help"><div class="kicker">この世界について</div><h2>砂漠に種を蒔く</h2>
  <p>砂漠のまんなかに、家が一軒だけの小さな村があります。村から先は、どこまでも砂漠。緑から10マス離れると砂嵐が吹いていて、その先へは進めません。種は、緑の上にだけ蒔けます。</p>
  <div class="flow"><div><b>🌰</b>種を蒔く</div><i>›</i><div><b>✉️</b>手紙で<br>水やり</div><i>›</i><div><b>🌱</b>芽が出る</div><i>›</i><div><b>🤲</b>ありがとう</div><i>›</i><div><b>🌸</b>花が咲き<br>緑が広がる</div></div>
- <p>種には、抱えている生きづらさと、それにどう向き合っているかを書きます。誰かの種を見つけたら、優しい言葉の手紙で水をあげてください。手紙は蒔いた人にだけ届き、名前はどこにも表示されません。</p>
+ <p>種には、抱えている生きづらさと、それにどう向き合っているかを書きます。誰かの種を見つけたら、やさしい言葉の手紙で水をあげてください。手紙は蒔いた人にだけ届き、名前はどこにも表示されません。</p>
  <p>蒔いた人が「ありがとう」を返すと花が咲き、まわり8マスの砂が緑に変わります。そこにまた種が蒔けるようになります。緑が広がるほど嵐はやわらぎ、世界は少しずつ先へひらけていきます。</p>
  <p>焚き火のそばのおばあちゃんに話しかけると、この世界のことや、種の蒔き方・水やりのこつを教えてくれます。</p>
  <p class="note">砂漠をタップすると歩けます（パソコンでは矢印キーでも）。右上の ☾ で昼と夜を切り替えられます（ふだんは時刻に合わせて変わります）。</p>

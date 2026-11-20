@@ -47,8 +47,8 @@ check(!(await getRaw(`users/${me}`)).fields.dummies, '花が咲いても、締�
 await page.getByText('はじめる', { exact: true }).click();
 await sleep(2200); await page.screenshot({ path: 'screenshots/practice_1_gust.png' });
 await sleep(800); await page.screenshot({ path: 'screenshots/practice_2_gust.png' });
-await page.getByText('ほら砂風に乗って、種が飛んできたよ。優しい言葉で水やりしてみておくれ。', { exact: true }).waitFor({ timeout: 10000 });
-check(true, '風のあと、おばあちゃん「ほら砂風に乗って、種が飛んできたよ。優しい言葉で水やりしてみておくれ。」');
+await page.getByText('ほら砂風に乗って、種が飛んできたよ。やさしい言葉で水やりしてみておくれ。', { exact: true }).waitFor({ timeout: 10000 });
+check(true, '風のあと、おばあちゃん「ほら砂風に乗って、種が飛んできたよ。やさしい言葉で水やりしてみておくれ。」');
 await page.screenshot({ path: 'screenshots/practice_3_talk.png' });
 const dm = (await getRaw(`users/${me}`)).fields.dummies.mapValue.fields;
 check(JSON.stringify(Object.keys(dm).sort()) === JSON.stringify(['s0', 's1', 's7']), '練習の種は全員共通の 3 つ');
