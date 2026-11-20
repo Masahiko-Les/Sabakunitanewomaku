@@ -57,10 +57,12 @@ await expect(false, '見た印に bool 以外', () => updateDoc(U(B), { openingS
 
 // おばあちゃんの種が咲いたあとの 3 つの種の場所
 await expect(true, '3 つの種の場所を保存する', () => updateDoc(U(B), { dummies: { s0: { x: 47, y: 52 }, s3: { x: 53, y: 49 }, s7: { x: 48, y: 48 } } }));
-await expect(false, '4 つ以上は保存できない', () => updateDoc(U(B), { dummies: { s0: { x: 1, y: 1 }, s1: { x: 2, y: 2 }, s2: { x: 3, y: 3 }, s3: { x: 4, y: 4 } } }));
+await expect(true, '運営の種を足して、8 つまで保存できる', () => updateDoc(U(B), { dummies: Object.fromEntries([0,1,2,3,4,5,6,7].map(i => ['s' + i, { x: i, y: 1 }])) }));
+await expect(true, '補充した日を記録する', () => updateDoc(U(B), { refillDate: '2026-11-21' }));
+await expect(true, '補充した日（開発用に先の日付でもよい）', () => updateDoc(U(B), { refillDate: '2030-01-01' }));
+await expect(false, '補充した日が日付の形でない', () => updateDoc(U(B), { refillDate: 'tomorrow' }));
 await expect(false, '見本にない ID', () => updateDoc(U(B), { dummies: { s9: { x: 1, y: 1 } } }));
-await expect(false, '世界の外の場所', () => updateDoc(U(B), { dummies: { s0: { x: 100, y: 1 } } }));
-await expect(false, '場所以外のフィールド', () => updateDoc(U(B), { dummies: { s0: { x: 1, y: 1, text: 'x' } } }));
+// （場所の中身は確かめない：ルールの評価の上限 1000 式に収めるため。場所はその人自身の世界にしか効かない）
 
 // 「すべてのデータを消す」
 await expect(true, 'A が自分の users を消す（すべてのデータを消す）', () => deleteDoc(U(A)));

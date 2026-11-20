@@ -66,8 +66,15 @@ for (const [k, val] of Object.entries(dm)) {
 }
 check(!!opened, `練習の種を開ける（${opened}）`);
 await page.fill('#tL', 'それは、つらいですね。'); await page.click('#ok');
+await sleep(3000);
+check(await received(me) === 0, '練習の種に水やりした日は、まだ本物の種は届かない（補充は翌日から）');
+// 翌日（開発用の時計を 1 日進める）：種の状態のもの（練習の種の残り 2 つ）が 3 つになるまで補充 → 本物の種が 1 つ届く
+await page.evaluate(() => localStorage.setItem('sabaku-dev-days', '1'));
+await page.reload({ waitUntil: 'load' });
 let n = 0; for (let i = 0; i < 30 && !n; i++) { await sleep(500); n = await received(me); }
-check(n === 1, '練習の種に水やりすると、本物の種が届き始める');
+check(n === 1, '翌日には、種の状態のものが 3 つになるよう、本物の種が届く');
+const u2 = (await getRaw(`users/${me}`)).fields;
+check(Object.keys(u2.dummies.mapValue.fields).length === 3, '本物の種が足りたので、運営の種は足されない');
 
 console.log('errors', errs);
 await browser.close();

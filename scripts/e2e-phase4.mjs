@@ -73,10 +73,10 @@ const Q = await plantA('ひとつめの種');
 await Promise.all(pages.map(p => p.goto(URL, { waitUntil: 'load' })));
 await Promise.all(pages.map(p => p.waitForFunction(() => document.querySelector('#btnPlant').textContent.length > 0)));
 const uids = await Promise.all(pages.map(uidOf));
-// 講習を終え、練習の種（世界の隅）に水やり済みの扱いにする（本物の種が届くのは、それから）
+// 講習を終え、練習の種（村の中心。もう花が咲いていて、置き場所の候補にならない）に水やり済みの扱いにする（本物の種が届くのは、それから）
 await Promise.all(uids.map(u => fetch(`${FS}/users/${u}?updateMask.fieldPaths=tutorial&updateMask.fieldPaths=metGranny&updateMask.fieldPaths=introSeen&updateMask.fieldPaths=dummies&updateMask.fieldPaths=sampleLetters`, {
   method: 'PATCH', headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' },
-  body: JSON.stringify({ fields: { tutorial: { integerValue: 3 }, metGranny: { booleanValue: true }, introSeen: { booleanValue: true }, dummies: { mapValue: { fields: { s0: { mapValue: { fields: { x: { integerValue: 0 }, y: { integerValue: 0 } } } } } } }, sampleLetters: { mapValue: { fields: { s0: { mapValue: { fields: { text: { stringValue: '練習の手紙' }, t: { integerValue: 1 }, thanked: { booleanValue: true } } } } } } } } }) })));
+  body: JSON.stringify({ fields: { tutorial: { integerValue: 3 }, metGranny: { booleanValue: true }, introSeen: { booleanValue: true }, dummies: { mapValue: { fields: { s0: { mapValue: { fields: { x: { integerValue: 50 }, y: { integerValue: 50 } } } }, s1: { mapValue: { fields: { x: { integerValue: 50 }, y: { integerValue: 50 } } } }, s2: { mapValue: { fields: { x: { integerValue: 50 }, y: { integerValue: 50 } } } }, s3: { mapValue: { fields: { x: { integerValue: 50 }, y: { integerValue: 50 } } } }, s4: { mapValue: { fields: { x: { integerValue: 50 }, y: { integerValue: 50 } } } }, s5: { mapValue: { fields: { x: { integerValue: 50 }, y: { integerValue: 50 } } } }, s6: { mapValue: { fields: { x: { integerValue: 50 }, y: { integerValue: 50 } } } }, s7: { mapValue: { fields: { x: { integerValue: 50 }, y: { integerValue: 50 } } } } } } }, sampleLetters: { mapValue: { fields: { s0: { mapValue: { fields: { text: { stringValue: '練習の手紙' }, t: { integerValue: 1 }, thanked: { booleanValue: true } } } }, s1: { mapValue: { fields: { text: { stringValue: '練習の手紙' }, t: { integerValue: 1 }, thanked: { booleanValue: true } } } }, s2: { mapValue: { fields: { text: { stringValue: '練習の手紙' }, t: { integerValue: 1 }, thanked: { booleanValue: true } } } }, s3: { mapValue: { fields: { text: { stringValue: '練習の手紙' }, t: { integerValue: 1 }, thanked: { booleanValue: true } } } }, s4: { mapValue: { fields: { text: { stringValue: '練習の手紙' }, t: { integerValue: 1 }, thanked: { booleanValue: true } } } }, s5: { mapValue: { fields: { text: { stringValue: '練習の手紙' }, t: { integerValue: 1 }, thanked: { booleanValue: true } } } }, s6: { mapValue: { fields: { text: { stringValue: '練習の手紙' }, t: { integerValue: 1 }, thanked: { booleanValue: true } } } }, s7: { mapValue: { fields: { text: { stringValue: '練習の手紙' }, t: { integerValue: 1 }, thanked: { booleanValue: true } } } } } } } } }) })));
 await Promise.all(pages.map(p => p.reload({ waitUntil: 'load' })));
 await Promise.all(pages.map(p => p.waitForFunction(() => document.querySelector('#btnPlant').textContent.length > 0)));
 await settle(uids);
@@ -93,6 +93,9 @@ check(q.deliveredTo.every(u => uids.includes(u)) && holders.every(n => q.deliver
 const P = [];
 for (let i = 0; i < 4; i++) P.push(await plantA(`種 P${i + 1}`));
 const H = await plantA('もう消えたいと思う日がある。', true);
+// 補充は 1 日 1 回なので、テストでは「まだ今日は補充していない」ことにしてから開き直す
+await Promise.all(uids.map(u => fetch(`${FS}/users/${u}?updateMask.fieldPaths=refillDate`, { method: 'PATCH', headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' },
+  body: JSON.stringify({ fields: { refillDate: { stringValue: '' } } }) })));
 await Promise.all(pages.map(p => p.reload({ waitUntil: 'load' })));
 await settle(uids, 12000);
 

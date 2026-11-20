@@ -559,7 +559,7 @@ function openSeed(s){if(s.mine)return openMine(s);if(s.granny)return openGrannyS
    const saved=s.sample?await saveUser({['sampleLetters.'+s.id]:{text:l.text,t:l.t,thanked:false}}):FB?await writeLetter(s.id,l.text):true;
    if(saved===false){delete ok.dataset.busy;ok.disabled=false;return}
    s.letters.push(l);save();
-   if(s.sample)setTimeout(receiveSeeds,1500);else if(FB)watchReceived(s);
+   if(!s.sample&&FB)watchReceived(s);
    closeSheet();toast('水をあげました');startWatering(s)}})}
 
 function openMine(s){
@@ -752,7 +752,7 @@ requestAnimationFrame(frame);refreshDot();
 /* ---------- user (Firestore) ---------- */
 // 講習の進み具合・説明を見たか・おばあちゃんへの手紙は users/{uid} を正とする
 function applyUser(u){if(!u)return;S.tutorial=u.tutorial||0;S.metGranny=!!u.metGranny;S.introSeen=!!u.introSeen;
- U.openingSeen=!!u.openingSeen;U.receivedToday=u.receivedToday||0;U.receivedDate=u.receivedDate||'';Object.assign(SEEN,u.seen||{});Object.assign(MUTED,u.muted||{});
+ U.openingSeen=!!u.openingSeen;U.receivedToday=u.receivedToday||0;U.receivedDate=u.receivedDate||'';U.refillDate=u.refillDate||'';Object.assign(SEEN,u.seen||{});Object.assign(MUTED,u.muted||{});
  if(!USE_SAMPLES&&u.dummies){Object.assign(DUMMIES,u.dummies);const have=new Set(S.seeds.map(s=>s.id));S.seeds.push(...sampleSeeds().filter(s=>!have.has(s.id)))}
  for(const s of S.seeds){if(!s.sample)continue;const l=(u.sampleLetters||{})[s.id];
   if(l)s.letters=[{id:'sample-letter',from:'me',text:l.text,t:l.t,thanked:!!l.thanked}];else s.letters=[]}
@@ -785,12 +785,14 @@ function plantDummies(animate){if(USE_SAMPLES||Object.keys(DUMMIES).length)retur
  const n=Math.min(PRACTICE.length,free.length-KEEP_FREE);if(n<=0)return;
  const near=free.slice(0,Math.max(n,8));
  const picks=PRACTICE.slice(0,n).map(i=>{const [x,y]=near.splice(Math.floor(Math.random()*near.length),1)[0];DUMMIES['s'+i]={x,y};return{id:'s'+i,x,y}});
- saveUser({dummies:{...DUMMIES}});
+ // 練習の種が届いた日は、補充しない（翌日から）
+ U.refillDate=dayKey(clock());saveUser({dummies:{...DUMMIES},refillDate:U.refillDate});
  const add=id=>{if(S.seeds.some(s=>s.id===id))return;S.seeds.push(...sampleSeeds().filter(s=>s.id===id));save();rebuildWorld()};
  if(!animate){picks.forEach(p=>add(p.id));return}
  startGustIn(picks,p=>add(p.id),()=>talkSheet(({play,button})=>play(TUT.practice,()=>button('閉じる',closeSheet))))}
 // 本物の種を受け取ってよいか：練習の種のどれかに水やりした（または、もう本物の種が届いている）
 const practiceDone=()=>S.seeds.some(s=>s.sample&&myLetter(s))||S.seeds.some(s=>!s.mine&&!s.sample&&!s.granny);
+// （本物の種は、この翌日の補充から届く）
 function freeGreenTiles(){const out=[];
  for(let y=0;y<N;y++)for(let x=0;x<N;x++){if(green[y*N+x]<.5||inVillage(x,y)||decor[y*N+x]||onDrawing(x,y)||seedOn(x,y))continue;out.push([x,y])}
  return out}
@@ -801,19 +803,45 @@ async function receiveWithRetry(id,x,y,t){
    await new Promise(r=>setTimeout(r,150+Math.random()*350*(i+1)))}}
  return null}
 let delivering=false;
-async function receiveSeeds(){if(!FB||delivering||!ready||!practiceDone())return;delivering=true;
- try{const t=dayKey(clock());let n=U.receivedDate===t?U.receivedToday:0;if(n>=DAILY_RECEIVE)return;
+// 本物の種を、最大 max 個まで受け取る（1 日 3 つまで）。受け取った数を返す
+async function receiveReal(max){let got=0;
+ {const t=dayKey(clock());let n=U.receivedDate===t?U.receivedToday:0;if(n>=DAILY_RECEIVE)return 0;const lim=Math.min(DAILY_RECEIVE,n+max);
   // ほかの人に先を越されることもあるので、候補は多めに取り、足りなければ探しなおす
-  for(let round=0;round<3&&n<DAILY_RECEIVE;round++){
-  const ids=await findDeliverable(new Set(S.seeds.map(s=>s.id)),(DAILY_RECEIVE-n)*4).catch(e=>{console.error('[findDeliverable]',e);return[]});if(!ids.length)break;
-  for(const id of ids){if(n>=DAILY_RECEIVE)break;
+  for(let round=0;round<3&&n<lim;round++){
+  const ids=await findDeliverable(new Set(S.seeds.map(s=>s.id)),(lim-n)*4).catch(e=>{console.error('[findDeliverable]',e);return[]});if(!ids.length)break;
+  for(const id of ids){if(n>=lim)break;
    const free=freeGreenTiles();if(free.length<=KEEP_FREE)break; // 自分で蒔く場所を残し、それ以上空いていなければ、次の機会に回す
    const[x,y]=free[Math.floor(Math.random()*free.length)];
    const r=await receiveWithRetry(id,x,y,t);
-   if(!r)continue;n=r.count;U.receivedToday=n;U.receivedDate=t;
+   if(!r)continue;n=r.count;U.receivedToday=n;U.receivedDate=t;got++;
    if(seedOn(x,y))continue;
    S.seeds.push({id,x,y,mine:false,h:r.seed.h,f:r.seed.f,t:r.seed.createdAt?.toMillis?.()||Date.now(),flower:r.seed.flower||0,letters:[]});save()}}}
+ return got}
+// 種の状態のもの：まだ自分が水やりしていない、ほかの人の種（本物・練習・運営の種）
+const FILL_TARGET=3;
+const seedStateCount=()=>S.seeds.filter(s=>!s.mine&&!s.granny&&!s.hidden&&shown(s)&&!myLetter(s)).length;
+// 日付が変わったら、種の状態のものが 3 つになるまで補充する：まず本物の種（1 日 3 つまで）、足りなければ運営が用意した種
+// （講習が終わり、練習の種のどれかに水やりしてから。補充した日は users.refillDate に記録して、その日はもう補充しない）
+async function receiveSeeds(){if(delivering||!ready||(S.tutorial||0)<3||!practiceDone())return;
+ const today=dayKey(clock());if(U.refillDate===today)return;delivering=true;
+ try{let need=FILL_TARGET-seedStateCount();
+  if(need>0&&FB){need-=await receiveReal(need).catch(e=>{console.error('[receiveReal]',e);return 0});
+   // ほかの人と取り合いになったり、通信に失敗したりして、まだ届けられる本物の種が残っているなら、今日の補充はまだ終えない（少しして、もう一度）
+   const n=U.receivedDate===today?U.receivedToday:0;
+   if(need>0&&n<DAILY_RECEIVE){const left=await findDeliverable(new Set(S.seeds.map(s=>s.id)),1).catch(()=>null);
+    if(left===null||left.length){refillRetry=Math.min(6,refillRetry+1);if(refillRetry<6){setTimeout(receiveSeeds,3000+Math.random()*4000);return}}}}
+  if(need>0)addFillers(need);
+  refillRetry=0;U.refillDate=today;saveUser({refillDate:today})}
  finally{delivering=false}}
+let refillRetry=0;
+// 運営が用意した種（見本の文章のうち、まだ使っていないもの）を、空いている緑のマスに置く。手紙はどこにも届かず、翌日にありがとうが返る
+function addFillers(n){if(USE_SAMPLES)return;
+ const pool=SAMPLES.map((_,i)=>i).filter(i=>!DUMMIES['s'+i]).sort(()=>Math.random()-.5);
+ const free=freeGreenTiles();let added=0;
+ for(const i of pool){if(added>=n||free.length<=KEEP_FREE)break;const [x,y]=free.splice(Math.floor(Math.random()*free.length),1)[0];DUMMIES['s'+i]={x,y};added++}
+ if(!added)return;
+ saveUser({dummies:{...DUMMIES}});
+ const have=new Set(S.seeds.map(s=>s.id));S.seeds.push(...sampleSeeds().filter(s=>!have.has(s.id)));save();rebuildWorld()}
 
 /* ---------- letters & thanks: 手紙が届く・ありがとうが返る ---------- */
 // 未読：自分の種に、ほかの人（自分以外）から手紙が届いた／自分の手紙に、ありがとうが返ってきた
