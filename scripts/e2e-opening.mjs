@@ -78,7 +78,7 @@ async function fullRun(choice, w, h, shots) {
   await sleep(1500);
   check((await vt(page)) === 'あなたが抱える\n生きづらさは、ありますか？', `[${choice}] 問いの文言（改行も）`);
   const chips = await page.$$eval('#opening .chip', bs => bs.map(b => b.textContent));
-  check(JSON.stringify(chips) === JSON.stringify(['吃音', 'うつ', '不安・パニック', '摂食障害', '発達の特性', '介護', '子育て', '不登校・ひきこもり', '仕事', '人間関係', 'その他', 'まだ、言葉にできない']), `[${choice}] 選択肢`);
+  check(JSON.stringify(chips) === JSON.stringify(['吃音', '介護', '人間関係', 'その他', 'まだ、言葉にできない']), `[${choice}] 選択肢`);
   const rv = await rect(page, '#opening #vt'), rc = await rect(page, '#opening #chips'), rg = await rect(page, '#opening #girl');
   check(!hit(rv, rc) && !hit(rv, rg) && !hit(rg, rc) && rg.t >= 0, `[${choice} ${w}×${h}] 文字・選択肢・女の子が重ならない（文字 ${rv.t|0}-${rv.b|0}／選択肢 ${rc.t|0}-／女の子 ${rg.t|0}-${rg.b|0}）`);
   if (shots) await page.screenshot({ path: `screenshots/op_${w}x${h}_1_question.png` });
@@ -114,7 +114,7 @@ async function skipRun(at) {
   let choice = null;
   if (at === 'chips' || at === 'title') await readGirl(page, () => page.evaluate(() => document.querySelector('#opening #chips').classList.contains('on')));
   if (at === 'title') {
-    await sleep(1200); await page.click('#opening .chip[data-val="仕事"]'); choice = '仕事';
+    await sleep(1200); await page.click('#opening .chip[data-val="人間関係"]'); choice = '人間関係';
     await readGirl(page, () => page.evaluate(() => document.querySelector('#opening #title')?.classList.contains('on')));
   }
   if (at === 'dark') await sleep(300);

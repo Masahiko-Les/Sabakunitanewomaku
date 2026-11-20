@@ -36,11 +36,28 @@ await fetch(`${FS}/users/${me}?updateMask.fieldPaths=tutorial&updateMask.fieldPa
     dummies: { mapValue: { fields: { s0: { mapValue: { fields: { x: { integerValue: 0 }, y: { integerValue: 0 } } } } } } }, sampleLetters: { mapValue: { fields: { s0: { mapValue: { fields: { text: { stringValue: '練習の手紙' }, t: { integerValue: 1 }, thanked: { booleanValue: true } } } } } } } } }) });
 await page.reload({ waitUntil: 'load' }); await boot();
 
-// ── 1 つ目：② まで書く。途中で「もうすこし直す」
+let b;
+// ── ① に危機的な言葉：おばあちゃんが相談先を出し、種は蒔かずに会話を終える
 await page.mouse.click(285, 309); await page.waitForTimeout(3500);
+const before = (await (await fetch(`${FS}/worlds/${me}/tiles`, { headers: OWNER })).json()).documents?.length || 0;
 await page.click('#btnPlant');
 await page.locator('#tIn').waitFor({ state: 'visible' });
-let b = await bubs();
+await page.fill('#tIn', 'もう死にたい。'); await page.click('#pTalk');
+await page.locator('#pClose').waitFor({ state: 'visible', timeout: 5000 });
+b = await bubs();
+const ct = await page.textContent('#talk');
+check(b.some(x => x.t.startsWith('だからね、「死にたい」「消えてしまいたい」')) && ct.includes('0120-783-556') && b.some(x => x.t.includes('迷わず119番')) && b.some(x => x.t.startsWith('助けを求めるのは')),
+  '① に危機ワード：おばあちゃんの言葉と相談先が出る');
+check(!(await page.$('#pSkip')) && !(await page.$('#tIn')), '② の問いかけには進まない');
+await shot('10_crisis');
+await page.click('#pClose'); await page.waitForTimeout(800);
+const after = (await (await fetch(`${FS}/worlds/${me}/tiles`, { headers: OWNER })).json()).documents?.length || 0;
+check(after === before && !(await page.evaluate(() => document.querySelector('#sheet').classList.contains('on'))), '「閉じる」で終わり、種は蒔かれない');
+
+// ── 1 つ目：② まで書く。途中で「もうすこし直す」（危機ワードのときと同じマスに立ったまま）
+await page.click('#btnPlant');
+await page.locator('#tIn').waitFor({ state: 'visible' });
+b = await bubs();
 check(b.length === 1 && b[0].t === PLANT_TALK.ask, 'ステップ1：おばあちゃんの問いかけ（全文を一度に）');
 check(await inputs() === 1, 'ステップ1：入力欄は 1 つだけ');
 check(await page.isDisabled('#pTalk'), '空欄では「話す」を押せない');

@@ -60,7 +60,8 @@ export async function initUser() {
 /** users/{uid} の一部を更新する（失敗しても画面は止めない）。 */
 export function saveUser(patch) {
   if (!userRef) return Promise.resolve();
-  return updateDoc(userRef, patch).catch(e => console.error('[saveUser]', e));
+  // 保存できたら true、できなければ false（水やりの演出は、保存できたときだけ出す）
+  return updateDoc(userRef, patch).then(() => true).catch(e => { console.error('[saveUser]', e); return false; });
 }
 
 /** 自分の世界（worlds/{uid}/tiles）と、そこにある種を読む。読めない種（hidden など）は除く。 */
@@ -221,7 +222,7 @@ export function writeLetter(seedId, text) {
   if (!myUid) return Promise.resolve();
   return setDoc(doc(db, 'seeds', seedId, 'letters', myUid),
     { writerUid: myUid, text, createdAt: serverTimestamp(), thanked: false, thankedAt: null })
-    .catch(e => console.error('[writeLetter]', e));
+    .then(() => true).catch(e => { console.error('[writeLetter]', e); return false; });
 }
 
 /** ありがとうを返す（蒔いた人だけ。取り消しはできない）。 */

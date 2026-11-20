@@ -71,7 +71,7 @@ check(!/おばあちゃん/.test(await btn()), `講習を終えたまま再開�
 
 // 4. 種を蒔く（hidden になる言葉で）→ 相談先シート
 await page.mouse.click(237, 453); await page.waitForTimeout(3500);
-await sowSeed(page, '確認用の種です。消えたい日がある。', '公開版の動作確認のための種です。', { crisis: true }); await page.waitForTimeout(1000);
+await sowSeed(page, '確認用の種です。', '公開版の動作確認のための種です。消えたい日がある。', { crisis: true }); await page.waitForTimeout(1000);
 await page.screenshot({ path: 'screenshots/prod_2_crisis.png' });
 check((await page.textContent('#sheetBody')).includes('0120-783-556'), '蒔いたあとに相談先のシートが出た');
 const seedId = await page.evaluate(() => JSON.parse(localStorage.getItem('sabaku-ni-tane-v3')).seeds.find(s => s.mine)?.id);

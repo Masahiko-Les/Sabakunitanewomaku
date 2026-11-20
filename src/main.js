@@ -3,6 +3,8 @@ import { enabled as FB, initUser, saveUser, loadMyWorld, plantSeed, findDelivera
   getUid, watchLetters, watchMyLetter, writeLetter, thankLetter, resetAll, reportSeed, reportLetter, pullSeed } from './firebase.js';
 import { startOpening, grandmaLines, arrivalLines } from './opening/opening.js';
 import { PLANT_TALK, PLANT_BUTTONS, PLANT_PLACEHOLDERS } from './talk/plant.js';
+import { WateringAnimation, chooseStandTile } from './watering/watering-animation.js';
+import { drawGirlWithCan } from './watering/girl-with-can.js';
 
 // 見本の種 8 つを置くか。公開版では置かない（最初は種も花もない）。VITE_USE_SAMPLES=true で試作版と同じく置く
 const USE_SAMPLES = import.meta.env.VITE_USE_SAMPLES === 'true';
@@ -143,7 +145,7 @@ let target=null,pendingOpen=null,moving=false,lastStep={x:P.x,y:P.y},tapFx=null,
 const prints=[],sparks=[],keys={};
 const dust=Array.from({length:150},()=>({x:Math.random()*1400-200,y:Math.random()*1000-100,v:180+Math.random()*220,len:8+Math.random()*22}));
 const flies=Array.from({length:16},(_, i)=>({a:Math.random()*6.28,r:40+Math.random()*150,s:.2+Math.random()*.4,ph:Math.random()*6.28}));
-addEventListener('keydown',e=>{if(sheetOpen||!ready)return;const k=e.key;if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','w','a','s','d'].includes(k)){keys[k]=1;e.preventDefault()}});
+addEventListener('keydown',e=>{if(sheetOpen||!ready||inputLocked())return;const k=e.key;if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','w','a','s','d'].includes(k)){keys[k]=1;e.preventDefault()}});
 addEventListener('keyup',e=>{keys[e.key]=0});
 
 function solid(wx,wy){const[tx,ty]=tileOf(wx,wy);
@@ -157,7 +159,7 @@ function solid(wx,wy){const[tx,ty]=tileOf(wx,wy);
  return false}
 function stormMsg(){const n=performance.now();if(n-lastStormMsg>4500){lastStormMsg=n;toast('砂嵐が強くて、この先へは進めない')}}
 
-cv.addEventListener('pointerdown',e=>{if(sheetOpen||!ready)return;
+cv.addEventListener('pointerdown',e=>{if(sheetOpen||!ready||inputLocked())return;
  const wx=e.clientX+cam.x,wy=e.clientY+cam.y;tapFx={x:wx,y:wy,t:performance.now()};
  if(Math.hypot(wx-GRAN.x,wy-GRAN.y+8)<26){if(Math.hypot(P.x-GRAN.x,P.y-GRAN.y)<120)openGranny();else{target={x:GRAN.x-6,y:GRAN.y+42};pendingOpen='granny'}return}
  if(Math.hypot(wx-FIRE.x,wy-FIRE.y+8)<26&&Math.hypot(P.x-FIRE.x,P.y-FIRE.y)<130){toast('焚き火が、静かに燃えている');return}
@@ -178,10 +180,14 @@ function plantState(){const tx=Math.floor(P.x/TILE),ty=Math.floor((P.y+10)/TILE)
 
 function update(dt,now){
  let vx=0,vy=0;moving=false;
- if(!sheetOpen){if(keys.ArrowLeft||keys.a)vx--;if(keys.ArrowRight||keys.d)vx++;if(keys.ArrowUp||keys.w)vy--;if(keys.ArrowDown||keys.s)vy++}
+ // 水やり演出：操作を返すまでは、女の子の位置と向きは演出が決める。終わったら、あとの処理（after）へ
+ if(water){const st=water.anim.update(now);
+  if(st.lockInput){P.x=st.girlPx.x;P.y=st.girlPx.y-11;if(st.facing==='left')P.face=-1;else if(st.facing==='right')P.face=1;moving=st.walking;target=null;pendingOpen=null}
+  if(water.anim.finished){const a=water.after;water=null;if(a)a()}}
+ if(!sheetOpen&&!inputLocked()){if(keys.ArrowLeft||keys.a)vx--;if(keys.ArrowRight||keys.d)vx++;if(keys.ArrowUp||keys.w)vy--;if(keys.ArrowDown||keys.s)vy++}
  const sp=175;let mx=0,my=0;
  if(vx||vy){target=null;pendingOpen=null;const l=Math.hypot(vx,vy);mx=vx/l*sp*dt;my=vy/l*sp*dt}
- else if(target&&!sheetOpen){const dx=target.x-P.x,dy=target.y-P.y,d=Math.hypot(dx,dy);
+ else if(target&&!sheetOpen&&!inputLocked()){const dx=target.x-P.x,dy=target.y-P.y,d=Math.hypot(dx,dy);
   if(d<2.5){P.x=target.x;P.y=target.y;target=null;if(pendingOpen==='granny'){pendingOpen=null;openGranny()}else if(pendingOpen){const s=S.seeds.find(z=>z.id===pendingOpen);pendingOpen=null;if(s)openSeed(s)}}
   else{const st=Math.min(d,sp*dt);mx=dx/d*st;my=dy/d*st}}
  if(mx||my){let hit=null;
@@ -232,15 +238,17 @@ function drawFlower(x,y,type,sc,t){const F=FLOWERS[type%5],sw=Math.sin(t/900+x*.
  ctx.fillStyle=F.c;ctx.beginPath();ctx.arc(0,0,2.6,0,Math.PI*2);ctx.fill();ctx.restore()}
 const OFFS=[[0,-3]];
 function bloomScale(s,i,n){if(i===n-1&&s.bloomAt){const k=clamp((Date.now()-s.bloomAt)/1400,0,1);return 1-Math.pow(1-k,3)}return 1}
-function drawSeed(s,t){const x=s.x*TILE+TILE/2,y=s.y*TILE+TILE/2,st=stageOf(s);
+function drawSeed(s,t){const x=s.x*TILE+TILE/2,y=s.y*TILE+TILE/2,wa=wateringOf(s),st=wa?(wa.seedVisible?'seed':'sprout'):stageOf(s),gp=wa?wa.sprout:1;
  if((s.mine&&s.unread)||(s.granny&&(S.tutorial||0)===1)){const a=.25+.15*Math.sin(t/400);const g=ctx.createRadialGradient(x,y,2,x,y,26);g.addColorStop(0,`rgba(255,240,200,${a})`);g.addColorStop(1,'rgba(255,240,200,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,26,0,Math.PI*2);ctx.fill()}
  if(st!=='flower'){ell(x,y+4,13,5.5,'#d8b07c');ell(x,y+3,11,4,'#e2bf8c')}
+ if(wa)water.anim.drawWet(ctx); // 水やり演出：土が濡れた色になる
  if(s.mine){ctx.setLineDash([2,4]);ctx.strokeStyle='rgba(255,255,255,.75)';ctx.lineWidth=1.2;ctx.beginPath();ctx.ellipse(x,y+4,17,7.5,0,0,Math.PI*2);ctx.stroke();ctx.setLineDash([])}
  if(st==='seed'){if(s.plantedAt&&t<s.plantedAt)return;const g=s.plantedAt?clamp((t-s.plantedAt)/250,0,1):1;ell(x,y+2-(1-g)*2,3.2,2.3,'#8a6440');
   // ② まで書かれた種には、小さな葉を 1 枚だけ（控えめに）
   if(s.f){ctx.fillStyle='rgba(134,184,116,.9)';ctx.beginPath();ctx.ellipse(x+4.2,y-.6,2.6,1.2,-.6,0,Math.PI*2);ctx.fill()}}
- else if(st==='sprout'){const sw=Math.sin(t/800+x)*1.2;ctx.strokeStyle='#6f9a5e';ctx.lineWidth=1.8;ctx.beginPath();ctx.moveTo(x,y+3);ctx.lineTo(x+sw,y-6);ctx.stroke();
-  ctx.fillStyle='#86b874';ctx.beginPath();ctx.ellipse(x+sw-4,y-7,4.5,2.2,.5,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.ellipse(x+sw+4,y-8,4.5,2.2,-.5,0,Math.PI*2);ctx.fill()}
+ else if(st==='sprout'){const sw=Math.sin(t/800+x)*1.2*gp,top=y+3-9*gp;ctx.strokeStyle='#6f9a5e';ctx.lineWidth=1.8;ctx.beginPath();ctx.moveTo(x,y+3);ctx.lineTo(x+sw,top);ctx.stroke();
+  // 水やり演出のあいだは芽が伸びて（gp）、後半で双葉が開く。演出のあとは、いつもの芽（gp=1）
+  const lf=clamp((gp-.5)*2,0,1);if(lf>0){ctx.fillStyle='#86b874';ctx.beginPath();ctx.ellipse(x+sw-4*lf,top-1*lf,4.5*lf,2.2*lf,.5,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.ellipse(x+sw+4*lf,top-2*lf,4.5*lf,2.2*lf,-.5,0,Math.PI*2);ctx.fill()}}
  else{const n=Math.min(OFFS.length,thanksOf(s));for(let i=0;i<n;i++)drawFlower(x+OFFS[i][0],y+OFFS[i][1],s.flower+i*2,bloomScale(s,i,n),t)}}
 function drawPlayer(t){const bob=moving?Math.sin(t/85)*1.4:0,k=moving?Math.sin(t/85):0,x=P.x,y=P.y,f=P.face,H='#4a3a2e',SK='#f4d6b6';
  ell(x,y+12,9,3.4,'rgba(120,80,40,.22)');
@@ -308,7 +316,7 @@ function draw(t){ctx.setTransform(dpr,0,0,dpr,0,0);ctx.globalCompositeOperation=
  if(vis(HOUSE.x,HOUSE.y)){items.push([HOUSE.y,()=>drawHouse()]);items.push([FIRE.y,drawFireBase]);items.push([GRAN.y+8,()=>drawGranny(t)])}
  for(const tr of TREES)if(vis(tr.x,tr.y))items.push([tr.y,()=>drawTree(tr,t)]);
  for(const b of BUSHES)if(vis(b.x,b.y))items.push([b.y,()=>drawBush(b)]);
- items.push([P.y+10,()=>drawPlayer(t)]);
+ items.push([P.y+10,()=>{if(wateringGirl()){water.anim.setSpout(drawGirlWithCan(ctx,P.x,P.y+11,water.anim.state))}else drawPlayer(t)}]);
  items.sort((a,b)=>a[0]-b[0]).forEach(i=>i[1]());
  ctx.restore();
  ctx.drawImage(stormC,cam.x/TILE,cam.y/TILE,vw/TILE,vh/TILE,0,0,vw,vh);
@@ -329,6 +337,7 @@ function draw(t){ctx.setTransform(dpr,0,0,dpr,0,0);ctx.globalCompositeOperation=
   hole(dctx,FIRE.x,FIRE.y-6,175*flick,.95);
   for(const s of S.seeds){if(stageOf(s)!=='flower')continue;const x=s.x*TILE+TILE/2,y=s.y*TILE+TILE/2;if(!vis(x,y))continue;hole(dctx,x,y-2,36,.9)}
   hole(dctx,P.x,P.y,62,.4);
+  if(water){const sp=water.anim.seedPx;hole(dctx,sp.x,sp.y-4,40,.55)} // 夜でも、水滴・波紋・芽が見えるように
   ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(dk,0,0);ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.globalCompositeOperation='lighter';ctx.globalAlpha=.08*night;ctx.drawImage(greenC,cam.x/TILE,cam.y/TILE,vw/TILE,vh/TILE,0,0,vw,vh);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
   ctx.save();ctx.translate(-cam.x,-cam.y);ctx.globalCompositeOperation='lighter';
@@ -346,7 +355,7 @@ function draw(t){ctx.setTransform(dpr,0,0,dpr,0,0);ctx.globalCompositeOperation=
  if(!sheetOpen&&Math.hypot(P.x-GRAN.x,P.y-GRAN.y)<230){const bx=GRAN.x+2,by=GRAN.y-40+Math.sin(t/500)*1.5;
   ctx.fillStyle='rgba(255,252,245,.95)';ctx.beginPath();ctx.roundRect(bx-15,by-10,30,18,9);ctx.fill();ctx.beginPath();ctx.moveTo(bx-3,by+7);ctx.lineTo(bx,by+12);ctx.lineTo(bx+3,by+7);ctx.fill();
   for(let i=-1;i<=1;i++)ell(bx+i*7,by-1,1.7,1.7,`rgba(138,117,96,${.45+.55*((Math.floor(t/350)%3)===i+1)})`)}
- ctx.restore();drawFall(t);drawGust(t)}
+ ctx.restore();drawFall(t);drawGust(t);drawWaterAir()}
 function drawGranny(t){const x=GRAN.x,y=GRAN.y,br=Math.sin(t/900)*.6;
  ell(x,y+11,14,4.5,'rgba(60,50,40,.22)');
  ctx.fillStyle='#8a5e3e';ctx.beginPath();ctx.roundRect(x-11,y+2,22,8,3);ctx.fill();ell(x+11,y+6,2.5,4,'#a87a55');
@@ -374,14 +383,35 @@ function careHTML(){return `<p class="hard" style="font-size:15.5px">つらい�
 function bloom(s){s.bloomAt=Date.now();const before=storm.reduce((a,v)=>a+(v>.5),0);rebuildWorld();const after=storm.reduce((a,v)=>a+(v>.5),0);
  setTimeout(()=>toast(after<before?'花のまわりに緑が広がり、嵐が少しやわらいだ':'花のまわりに、緑が広がった'),900)}
 
+/* ---------- watering: 水やりを保存できたら、女の子がじょうろで種に水をあげる演出 ---------- */
+// 演出の本体・タイムラインは src/watering/watering-animation.js、女の子の絵は src/watering/girl-with-can.js
+let water=null; // { id: 種の id, anim: WateringAnimation, after: 演出が終わったあとの処理 }
+const reduceMotion=()=>{try{return matchMedia('(prefers-reduced-motion: reduce)').matches}catch(e){return false}};
+const inputLocked=()=>!!(water&&water.anim.state.lockInput);
+const wateringGirl=()=>!!(water&&water.anim.running&&water.anim.state.lockInput);
+const wateringOf=s=>water&&water.id===s.id&&!water.anim.finished?water.anim.state:null;
+function startWatering(s,after){
+ const cx=(s.x+.5)*TILE,cy=(s.y+.5)*TILE,[gx,gy]=tileOf(P.x,P.y+10);
+ // 立ち位置：種の上下左右のうち、歩けて一番近いマス。4 方向とも塞がっていれば、その場で演出だけ
+ const stand=chooseStandTile({x:s.x,y:s.y},{x:gx,y:gy},(x,y)=>!solid((x+.5)*TILE,(y+.5)*TILE+1)&&!seedOn(x,y));
+ const from={x:P.x,y:P.y+11},standPx=stand?{x:(stand.x+.5)*TILE,y:(stand.y+.5)*TILE+1}:from;
+ // マップの女の子は左右の絵だけなので、上下から近づいたときは種のある側を向く
+ const facing=!stand?(cx<P.x?'left':'right'):stand.facing==='up'||stand.facing==='down'?(cx<standPx.x?'left':'right'):stand.facing;
+ const anim=new WateringAnimation({tileSize:TILE,seedTile:{x:s.x,y:s.y},seedPx:{x:cx,y:cy+2},fromPx:from,standPx,facing});
+ target=null;pendingOpen=null;anim.start();if(reduceMotion())anim.skipToEnd();
+ water={id:s.id,anim,after}}
+function drawWaterAir(){if(!water)return;ctx.save();ctx.translate(-cam.x,-cam.y);water.anim.drawRipples(ctx);water.anim.drawAirEffects(ctx);ctx.restore()}
+
 /* ---------- plant ---------- */
 // 「やさしい言葉で、水をあげる」に添える、ジョウロの絵（注ぎ口から水が 3 滴）
 const CAN_ICON='<svg class="canicon" viewBox="0 0 30 22" aria-hidden="true"><path d="M8 7h12l-1.4 12.2a1.6 1.6 0 0 1-1.6 1.4h-6a1.6 1.6 0 0 1-1.6-1.4z" fill="#8fb3c4"/><rect x="7" y="5.6" width="14" height="2.6" rx="1.3" fill="#7aa2b5"/><path d="M10.5 6V4.2a3.5 3.5 0 0 1 7 0V6" fill="none" stroke="#7aa2b5" stroke-width="1.8"/><path d="M19.5 12.5l6-5" stroke="#7aa2b5" stroke-width="2.2" stroke-linecap="round"/><ellipse cx="26.2" cy="6.9" rx="1.9" ry="1.2" transform="rotate(-40 26.2 6.9)" fill="#7aa2b5"/><circle cx="27.4" cy="11" r="1" fill="#a9d3e6"/><circle cx="25.6" cy="13.4" r="1" fill="#a9d3e6"/><circle cx="28.3" cy="14.6" r="1" fill="#a9d3e6"/></svg>';
 // 「〇〇の種」の見出しに添える、マップと同じ土と種の絵
 const SEED_ICON='<svg class="seedicon" viewBox="-14 -4 28 14" aria-hidden="true"><ellipse cx="0" cy="4" rx="13" ry="5.5" fill="#d8b07c"/><ellipse cx="0" cy="3" rx="11" ry="4" fill="#e2bf8c"/><ellipse cx="0" cy="2" rx="3.2" ry="2.3" fill="#8a6440"/></svg>';
+// 芽が出た種の見出しには、マップと同じ芽の絵（土＋茎＋双葉）
+const SPROUT_ICON='<svg class="seedicon sprout" viewBox="-14 -14 28 24" aria-hidden="true"><ellipse cx="0" cy="4" rx="13" ry="5.5" fill="#d8b07c"/><ellipse cx="0" cy="3" rx="11" ry="4" fill="#e2bf8c"/><path d="M0 3 L0 -6" stroke="#6f9a5e" stroke-width="1.8" stroke-linecap="round"/><ellipse cx="-4" cy="-7" rx="4.5" ry="2.2" transform="rotate(28.6 -4 -7)" fill="#86b874"/><ellipse cx="4" cy="-8" rx="4.5" ry="2.2" transform="rotate(-28.6 4 -8)" fill="#86b874"/></svg>';
 // 種カード：本文だけ。② があるときは、区切りの下に
 function seedCard(s){return `<div class="parchment"><p class="hard">${esc(s.h)}</p>${s.f?`<div class="psep"></div><p class="face">${esc(s.f)}</p>`:''}</div>`}
-$('#btnPlant').onclick=()=>{if(!ready)return;const pi=plantState();if(!pi.ok)return;plantTalk(pi,{h:'',f:''})};
+$('#btnPlant').onclick=()=>{if(!ready||inputLocked())return;const pi=plantState();if(!pi.ok)return;plantTalk(pi,{h:'',f:''})};
 // 種を蒔く：おばあちゃんとの会話。入力欄は 1 つずつ出す（① → ② → 確認）
 function plantTalk(pi,draft){talkSheet(({say,you,ctl,scroll})=>{
  const talk=document.getElementById('talk');
@@ -392,7 +422,10 @@ function plantTalk(pi,draft){talkSheet(({say,you,ctl,scroll})=>{
   const go=ctl.querySelector('#pTalk');const chk=()=>go.disabled=!ta.value.trim();ta.addEventListener('input',chk);chk();scroll();return ta};
  const step1=()=>{say(PLANT_TALK.ask);
   const ta=ask('h',2,60,2,[['pTalk',PLANT_BUTTONS.talk,'main']]);
-  ctl.querySelector('#pTalk').onclick=()=>{draft.h=ta.value.trim();you(draft.h);ctl.innerHTML='';setTimeout(step2,400)}};
+  ctl.querySelector('#pTalk').onclick=()=>{draft.h=ta.value.trim();you(draft.h);ctl.innerHTML='';setTimeout(CRISIS.test(draft.h)?crisis:step2,400)}};
+ // ① に危機的な言葉があったら：おばあちゃんの「とても苦しいときは」の話から抜き出して相談先を出し、種は蒔かずに会話を終える
+ const crisis=()=>{const H=TALK.help;[H[2],'{CONTACTS}',H[5],H[7]].forEach((l,i)=>setTimeout(()=>say(l),i*350));
+  setTimeout(()=>{ctl.innerHTML=`<div class="row"><button class="btn main small" id="pClose">閉じる</button></div>`;ctl.querySelector('#pClose').onclick=closeSheet;scroll()},4*350+200)};
  const step2=()=>{say(PLANT_TALK.how);
   const ta=ask('f',6,240,8,[['pSkip',PLANT_BUTTONS.skip,'ghost'],['pTalk',PLANT_BUTTONS.talk,'main']]);
   ctl.querySelector('#pTalk').onclick=()=>{draft.f=ta.value.trim();you(draft.f);ctl.innerHTML='';setTimeout(step3,400)};
@@ -491,7 +524,8 @@ function drawGust(t){if(!gust)return;const I=gust.I;
 const stageText={seed:'まだ、水を待っています',sprout:'芽が出ています',flower:'花が咲いています'};
 function openSeed(s){if(s.mine)return openMine(s);if(s.granny)return openGrannySeed(s);
  const mine=myLetter(s);
- let body=`<div class="kicker seedk">${SEED_ICON}誰かの種</div>${seedCard(s)}${stageOf(s)==='seed'?'':`<p class="state">${stageText[stageOf(s)]}</p>`}`; // 誰かの種：まだ種のときは、状態を書かない
+ // 誰かの種：種のとき・芽のときは状態を文字で書かず、見出しの絵（種／芽）でわかるようにする。花のときだけ「花が咲いています」
+ let body=`<div class="kicker seedk">${stageOf(s)==='sprout'?SPROUT_ICON:SEED_ICON}誰かの種</div>${seedCard(s)}${stageOf(s)==='flower'?`<p class="state">${stageText.flower}</p>`:''}`;
  if(!mine&&(S.tutorial||0)<3){body+=`<p class="note">水やりは、焚き火のそばのおばあちゃんに教わってからにしよう。</p><div class="row"><button class="btn soft small" id="x">閉じる</button></div>`}
  else if(!mine){body+=`<label class="wlabel">${CAN_ICON}やさしい言葉で、水をあげる（10行まで）</label><textarea id="tL" rows="5" maxlength="300" placeholder="アドバイスより、まずは受けとめる言葉を"></textarea><div class="count" id="cL"></div>
   ${s.sample?'':'<p class="note">手紙は、この種を蒔いた人にだけ届きます。ほかの人には見えません。</p>'}
@@ -506,9 +540,14 @@ function openSeed(s){if(s.mine)return openMine(s);if(s.granny)return openGrannyS
    reportSeed(s.id);stopWatch(s.id);S.seeds=S.seeds.filter(z=>z!==s);save();rebuildWorld();refreshDot();closeSheet();toast('知らせました。この種は、あなたの世界から見えなくなります')};
   const ta=el.querySelector('#tL');if(!ta)return;
   const ok=el.querySelector('#ok');lineLimit(ta,10,el.querySelector('#cL'));ta.addEventListener('input',()=>ok.disabled=!ta.value.trim());
-  ok.onclick=()=>{const l={id:getUid()||uid(),from:'me',text:ta.value.trim(),t:Date.now(),thanked:false};s.letters.push(l);save();
-   if(s.sample){saveUser({['sampleLetters.'+s.id]:{text:l.text,t:l.t,thanked:false}});setTimeout(receiveSeeds,1500)}
-   else if(FB){writeLetter(s.id,l.text);watchReceived(s)}closeSheet();toast('水をあげました')}})}
+  // 水やり：先に保存し、保存できたらシートを閉じて演出。保存できなければ演出は出さない（ボタンを押せる状態に戻す）
+  ok.onclick=async()=>{if(ok.dataset.busy)return;ok.dataset.busy=1;ok.disabled=true;
+   const l={id:getUid()||uid(),from:'me',text:ta.value.trim(),t:Date.now(),thanked:false};
+   const saved=s.sample?await saveUser({['sampleLetters.'+s.id]:{text:l.text,t:l.t,thanked:false}}):FB?await writeLetter(s.id,l.text):true;
+   if(saved===false){delete ok.dataset.busy;ok.disabled=false;return}
+   s.letters.push(l);save();
+   if(s.sample)setTimeout(receiveSeeds,1500);else if(FB)watchReceived(s);
+   closeSheet();toast('水をあげました');startWatering(s)}})}
 
 function openMine(s){
  const letters=s.letters.map(l=>`<div class="letter"><div class="from">${l.from==='me'?'自分から自分への手紙':'誰かからの手紙'}</div><div class="txt">${esc(l.text)}</div>
@@ -537,7 +576,7 @@ function confirmPull(s){openSheet(`<h2>この種を抜きますか？</h2>
 /* ---------- my seeds list ---------- */
 function goTo(s){const cx=(s.x+.5)*TILE,cy=(s.y+.5)*TILE;P.x=cx-TILE;P.y=cy-10;if(solid(P.x,P.y+10))P.x=cx+TILE;
  cam.x=clamp(P.x-vw/2,0,WORLD-vw);cam.y=clamp(P.y-vh*.45,0,WORLD-vh);prints.length=0;lastStep={x:P.x,y:P.y};target=null}
-$('#btnMine').onclick=()=>{if(!ready)return;
+$('#btnMine').onclick=()=>{if(!ready||inputLocked())return;
  const mine=S.seeds.filter(s=>s.mine&&shown(s)).sort((a,b)=>b.t-a.t),wat=S.seeds.filter(s=>!s.mine&&myLetter(s)&&shown(s));
  const item=s=>`<button class="list-item" data-go="${s.id}">${s.unread?'<span class="dot" style="margin:0 6px 0 0"></span>':''}${esc(s.h.split('\n')[0])}<div class="s">${s.hidden?'見えない場所に置いてあります':stageText[stageOf(s)]}${s.mine&&s.letters.length?` ・ 手紙 ${s.letters.length}通`:''}${!s.mine&&myLetter(s).thanked?' ・ ありがとうが返ってきました':''}</div></button>`;
  openSheet(`<div class="kicker seedk">${SEED_ICON}わたしの種</div>
@@ -636,7 +675,11 @@ function openGrannySeed(s){const mine=myLetter(s),tu=S.tutorial||0;
  else{body+=`<div class="letter"><div class="from">あなたがおばあちゃんに届けた手紙</div><div class="txt">${esc(mine.text)}</div></div><p class="state">${mine.thanked?'おばあちゃんから、ありがとうが返ってきました。':'おばあちゃんが、手紙を読んでいます。'}</p><div class="row"><button class="btn soft small" id="x">閉じる</button></div>`}
  openSheet(body,el=>{el.querySelector('#x').onclick=closeSheet;const ta=el.querySelector('#tL');if(!ta)return;
   const ok=el.querySelector('#ok');lineLimit(ta,10,el.querySelector('#cL'));ta.addEventListener('input',()=>ok.disabled=!ta.value.trim());
-  ok.onclick=()=>{s.letters.push({id:uid(),from:'me',text:ta.value.trim(),t:Date.now(),thanked:false});S.tutorial=2;save();saveUser({tutorial:2,grannyLetter:ta.value.trim()});closeSheet();toast('水をあげました');setTimeout(grannyThanks,1600)}})}
+  ok.onclick=async()=>{if(ok.dataset.busy)return;ok.dataset.busy=1;ok.disabled=true;const text=ta.value.trim();
+   if(await saveUser({tutorial:2,grannyLetter:text})===false){delete ok.dataset.busy;ok.disabled=false;return}
+   s.letters.push({id:uid(),from:'me',text,t:Date.now(),thanked:false});S.tutorial=2;save();
+   // 水やりの演出が終わってから、おばあちゃんが手紙を読む
+   closeSheet();toast('水をあげました');startWatering(s,()=>setTimeout(grannyThanks,400))}})}
 function openGranny(){target=null;const tu=S.tutorial||0;
  if(tu===0)return talkSheet(({play,button})=>play(TUT.intro,()=>button('おばあちゃんの種を見にいく',goGrannySeed)));
  if(tu===1)return talkSheet(({play,button})=>play(TUT.remind,()=>button('おばあちゃんの種を見にいく',()=>{closeSheet();walkToGrannySeed()})));
@@ -684,7 +727,7 @@ function openSettings(){
    try{localStorage.removeItem(KEY);localStorage.removeItem(OPEN_KEY);localStorage.removeItem(INTEREST_KEY)}catch(e){}
    location.reload()}})}
 function openCare(){openSheet(`<div class="kicker">困ったときの相談先</div>${contactsHTML()}<div class="row"><button class="btn main small" id="x">閉じる</button></div>`,e=>e.querySelector('#x').onclick=closeSheet)}
-$('#btnSet').onclick=()=>{if(ready)openSettings()};
+$('#btnSet').onclick=()=>{if(ready&&!inputLocked())openSettings()};
 
 /* ---------- loop ---------- */
 let last=performance.now();

@@ -103,3 +103,4 @@ textarea:focus{border-color:#e0b48e}
 .seedicon{width:26px;height:13px;flex:none}
 label.wlabel{display:flex;align-items:center;gap:6px}
 .canicon{width:24px;height:18px;flex:none}
+.seedicon.sprout{height:22px}

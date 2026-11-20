@@ -6,15 +6,13 @@ import './opening.css';
 
 const GIRL_SVG = `<svg id="girl" viewBox="18 8 106 98" aria-hidden="true">
     <defs>
-      <linearGradient id="gHair" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7a5a50"/><stop offset=".55" stop-color="#5a4039"/><stop offset="1" stop-color="#3e2c29"/></linearGradient>
+      <linearGradient id="gHair" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5e4a3b"/><stop offset=".55" stop-color="#4a3a2e"/><stop offset="1" stop-color="#3a2d23"/></linearGradient>
       <linearGradient id="gSkin" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff3ec"/><stop offset="1" stop-color="#f8d9c9"/></linearGradient>
-      <linearGradient id="gKnit" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e64a52"/><stop offset="1" stop-color="#b9283a"/></linearGradient>
+      <linearGradient id="gKnit" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#de7060"/><stop offset="1" stop-color="#c0503f"/></linearGradient>
       <linearGradient id="gIris" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b1a1e"/><stop offset=".55" stop-color="#6e3d33"/><stop offset="1" stop-color="#d79a63"/></linearGradient>
       <radialGradient id="gBlush"><stop offset="0" stop-color="#ff8f98" stop-opacity=".55"/><stop offset="1" stop-color="#ff8f98" stop-opacity="0"/></radialGradient>
     </defs>
     <ellipse cx="70" cy="100" rx="36" ry="3.2" fill="rgba(0,0,0,.4)"/>
-    <!-- 後ろ髪（背中に流れる） -->
-    <g transform="translate(55 58) scale(1.25) translate(-55 -58)"><path d="M62 26 C80 22 92 34 91 50 C92 59 93 66 95 72 C89 75 83 70 81 65 C78 61 75 60 72 60 Z" fill="url(#gHair)"/></g>
     <g transform="translate(60 56) scale(.8) translate(-60 -56)">
     <!-- 奥の脚 -->
     <path d="M56 66 L52 98" stroke="#e8bfad" stroke-width="7.5" stroke-linecap="round"/>
@@ -38,7 +36,7 @@ const GIRL_SVG = `<svg id="girl" viewBox="18 8 106 98" aria-hidden="true">
     </g>
     <!-- 頭（膝に顔をうずめ気味に、うつむいて目を閉じる） -->
     <g transform="translate(55 58) scale(1.25) translate(-55 -58) rotate(-12 62 46)">
-      <circle cx="64" cy="42" r="17" fill="url(#gHair)"/>
+      <path d="M43 46 C42 32 52 24 63 24 C76 24 84 32 84 46 L84 59 Q84 62 81 62 L69 62 L69 50 Z" fill="url(#gHair)"/>
       <path d="M44 44 C44 34 52 29 59 30 C67 31 72 38 71 47 C70 56 64 61 57 61 C50 61 44 55 44 44 Z" fill="url(#gSkin)"/>
       <ellipse cx="62.5" cy="53" rx="4.6" ry="2.8" fill="url(#gBlush)"/>
       <ellipse cx="48" cy="53" rx="3" ry="2.2" fill="url(#gBlush)"/>
@@ -50,13 +48,12 @@ const GIRL_SVG = `<svg id="girl" viewBox="18 8 106 98" aria-hidden="true">
       <path d="M61.4 51.6 C61.6 54.5 60.6 57 61.2 59 C61.8 60.8 63.6 60.2 63.4 58.4 C63.2 56 62.2 53.8 61.4 51.6 Z" fill="#cfeaff" opacity=".9"/>
       <circle cx="62.1" cy="58.4" r=".55" fill="#fff"/>
       <path d="M47.6 51.4 C47.2 53 47 54 47.3 55.2" stroke="#cfeaff" stroke-width=".9" fill="none" stroke-linecap="round" opacity=".8"/>
-      <path d="M56 43.8 Q59.5 42.6 63 43.8 M46.5 44 Q48.5 43 50.5 43.6" stroke="#7a5a50" stroke-width=".8" fill="none" stroke-linecap="round" opacity=".7"/>
+      <path d="M56 43.8 Q59.5 42.6 63 43.8 M46.5 44 Q48.5 43 50.5 43.6" stroke="#4a3a2e" stroke-width=".8" fill="none" stroke-linecap="round" opacity=".7"/>
       <path d="M44.6 52.6 l-.9 .9" stroke="#e3a99a" stroke-width=".8" stroke-linecap="round"/>
       <path d="M49.4 58 Q51 57.1 52.6 57.9" stroke="#c96f6a" stroke-width=".9" fill="none" stroke-linecap="round"/>
-      <path d="M43 46 C42 33 52 25 63 25 C74 25 82 32 81 43 C78 38 74 35 71 34 C71 39 69 42 66 44 C66 39 65 36 63 34 C61 39 58 42 54 43 C55 39 55 36 54 34 C50 37 46 41 43 46 Z" fill="url(#gHair)"/>
-      <path d="M73 36 C79 46 80 58 77 68 C74 60 72 50 70 44 Z" fill="url(#gHair)"/>
+      <path d="M42.6 44.5 C42 32.5 52 25 63 25 C75 25 82.5 32.5 82 44.5 L72 44.5 L71.5 42.4 L43.4 42.4 Z" fill="url(#gHair)"/>
+      <path d="M42.6 43 L42.4 57.5 Q42.6 59 44.4 59 L46.6 59 L46.4 44 Z" fill="url(#gHair)"/>
       <path d="M52 28.5 Q63 24.5 74 29" stroke="#f3d6c8" stroke-width="1.8" fill="none" opacity=".35" stroke-linecap="round"/>
-      <rect x="70" y="30.5" width="8.5" height="2.1" rx="1" fill="#f7ead7" transform="rotate(-20 74 31.5)"/>
     </g>
   </svg>`;
 
@@ -172,7 +169,8 @@ async function speak(textEl, nextEl, text, opt = {}) {
 const girlSay = (t, o) => speak($('vt'), $('vnext'), t, o);
 
 /* ---------- 選択肢 ---------- */
-const OPTIONS = ['吃音', 'うつ', '不安・パニック', '摂食障害', '発達の特性', '介護', '子育て', '不登校・ひきこもり', '仕事', '人間関係', 'その他'];
+// ひとまずこの 4 つ（＋「まだ、言葉にできない」）。今後増やす。増やすときは firestore.rules の interest の一覧にも入っているか確かめる
+const OPTIONS = ['吃音', '介護', '人間関係', 'その他'];
 function prepareChips() {
   const box = $('chips'), voice = $('voice');
   box.innerHTML = '';

@@ -88,7 +88,7 @@ check((await page.textContent('#sheetBody')).includes(H1) && (await page.textCon
 await page.reload({ waitUntil: 'load' }); await boot();
 await page.mouse.click(285, 213); await page.waitForTimeout(3500); // 初期位置から (52,48)
 check((await label()).includes('ここに種を蒔く'), `となりの蒔けるマスに立った（${await label()}）`);
-await plant('もう消えたいと思う日がある。', '夜は早く寝るようにしている。', { crisis: true });
+await plant('夜が長く感じる。', 'もう消えたいと思う日がある。', { crisis: true }); // ② の危機ワード（① のときは e2e-plant-talk で確かめる）
 check((await page.textContent('#sheetBody')).includes('種を預かりました'), '相談先シートが出た');
 await page.screenshot({ path: `${OUT}/p3_3_crisis.png` });
 tiles = await listDocs(`worlds/${uid}/tiles`);
