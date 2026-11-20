@@ -232,6 +232,7 @@ async function opening() {
     await sleep(400);
     for (const l of girlReply(c)) await girlSay(l);
     await girlSay('この下にはね、何かを抱えた人たちが\nひとりずつ、種を蒔いている場所があるの。');
+    await girlSay('一緒に行ってみようか');
     $('voice').classList.add('hide');
     tween(S, 'girlA', 0, 700);
     tween(S, 'orbA', 1, 500);

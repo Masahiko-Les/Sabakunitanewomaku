@@ -84,7 +84,7 @@ async function fullRun(choice, w, h, shots) {
   if (shots) await page.screenshot({ path: `screenshots/op_${w}x${h}_1_question.png` });
   await page.click(`#opening .chip[data-val="${choice}"]`);
   const reply = await readGirl(page, () => page.evaluate(() => document.querySelector('#opening #title')?.classList.contains('on')));
-  check(JSON.stringify(reply) === JSON.stringify([...CASES[choice].girl, GIRL_END]), `[${choice}] 女の子の返事 ${JSON.stringify(reply)}`);
+  check(JSON.stringify(reply) === JSON.stringify([...CASES[choice].girl, GIRL_END, '一緒に行ってみようか']), `[${choice}] 女の子の返事 ${JSON.stringify(reply)}`);
   check((await page.evaluate(() => localStorage.getItem('sabaku.interest'))) === choice, `[${choice}] localStorage に関心テーマ`);
   await page.locator('#opening #tapHint.on').waitFor({ timeout: 5000 });
   if (shots) await page.screenshot({ path: `screenshots/op_${w}x${h}_2_title.png` });
