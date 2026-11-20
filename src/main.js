@@ -91,6 +91,13 @@ const MUTED={}; // 知らせた手紙（users/{uid}.muted、'種ID_書いた人'
 const DUMMIES={}; // おばあちゃんの種が咲いたあとに蒔かれる 3 つの種の場所（users/{uid}.dummies、's0'〜's7' → {x,y}）
 const SEEN={}; // 種ごとに、最後に見たできごとの時刻（users/{uid}.seen）
 const FLOWERS=[{p:'#f29bb0',c:'#f7d36b',n:5,g:'255,150,180'},{p:'#f7c948',c:'#c97b2b',n:8,g:'255,210,90'},{p:'#ffffff',c:'#f2c14e',n:6,g:'255,250,235'},{p:'#b79be8',c:'#f5e08a',n:5,g:'190,160,255'},{p:'#f59a7a',c:'#fff1c1',n:6,g:'255,170,130'}];
+// 開発用：「次の日にする」で進めた日数。日付で動く処理（練習の種のありがとう、1 日の受け取り数、種と芽の 7 日）はこの時計を使う
+// サーバーの時刻（ルールの request.time）は進まないので、ルール側の期限は本当の時刻のまま
+const DEV_DAYS_KEY='sabaku-dev-days',DEV_KEY='sabaku-dev';
+try{if(new URLSearchParams(location.search).get('dev')==='1')localStorage.setItem(DEV_KEY,'1')}catch(e){}
+const devTools=import.meta.env.DEV||(()=>{try{return localStorage.getItem(DEV_KEY)==='1'}catch(e){return false}})();
+const devDays=(()=>{try{return devTools?Number(localStorage.getItem(DEV_DAYS_KEY))||0:0}catch(e){return 0}})();
+const clock=()=>Date.now()+devDays*86400000;
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function load(){try{localStorage.removeItem('sabaku-ni-tane-v1');localStorage.removeItem('sabaku-ni-tane-v2');const r=localStorage.getItem(KEY);if(r)S=JSON.parse(r)}catch(e){}
@@ -103,7 +110,7 @@ const thanksOf=s=>(s.bloom||0)+s.letters.filter(l=>l.thanked).length;
 const stageOf=s=>thanksOf(s)>0?'flower':(s.letters.length||s.sprout)?'sprout':'seed';
 const myLetter=s=>s.letters.find(l=>l.from==='me');
 // 種と芽は、蒔いてから 1 週間で消える（花は消えない）。手紙を読み込む前は、花かどうかわからないので見せない
-const expired=s=>!s.granny&&!s.sample&&Date.now()-s.t>SEED_LIFE;
+const expired=s=>!s.granny&&!s.sample&&clock()-s.t>SEED_LIFE;
 const shown=s=>!expired(s)||(s.loaded&&stageOf(s)==='flower');
 const hasNew=()=>S.seeds.some(s=>s.unread);
 const seedOn=(tx,ty)=>S.seeds.find(s=>s.x===tx&&s.y===ty);
@@ -712,6 +719,7 @@ function openSettings(){
  openSheet(`<div class="settings"><div class="kicker">設定</div><h2>設定</h2>
  <button class="list-item go" id="sHelp">この世界について</button>
  <button class="list-item go" id="sOpening">オープニングをもう一度見る</button>
+ ${devTools?`<button class="list-item go" id="sNextDay">次の日にする（開発用・いま +${devDays} 日）</button>`:''}
  <label>昼と夜</label><div class="seg">${seg}</div>
  <div class="gap"></div><button class="list-item go" id="sCare">困ったときの相談先</button>
  <label>データについて</label><p class="data">名前や連絡先は保存しません。種と手紙は、このブラウザに結びついた記録として保存されます。ブラウザのデータを消したり、別の端末で開いたりすると、自分の世界には戻れません。</p>
@@ -720,6 +728,7 @@ function openSettings(){
  <div class="row"><button class="btn main small" id="x">閉じる</button></div></div>`,el=>{
   el.querySelector('#x').onclick=closeSheet;
   el.querySelector('#sHelp').onclick=openHelp;
+  const nd=el.querySelector('#sNextDay');if(nd)nd.onclick=()=>{try{localStorage.setItem(DEV_DAYS_KEY,String(devDays+1))}catch(e){}location.reload()};
   el.querySelector('#sOpening').onclick=()=>{location.href=location.pathname+'?opening=1'};
   el.querySelector('#sCare').onclick=openCare;
   el.querySelectorAll('[data-sky]').forEach(b=>b.onclick=()=>{setSky(b.dataset.sky);el.querySelectorAll('[data-sky]').forEach(x=>x.classList.toggle('on',x===b))});
@@ -759,7 +768,7 @@ const U={receivedToday:0,receivedDate:''};
 const dayKey=ms=>{const d=new Date(ms);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
 
 /* ---------- samples: 見本の種への手紙は、どこにも届かず、翌日にありがとうが返って花が咲く ---------- */
-function sampleThanks(){const t=dayKey(Date.now());let ch=false;
+function sampleThanks(){const t=dayKey(clock());let ch=false;
  for(const s of S.seeds){if(!s.sample)continue;const l=myLetter(s);
   if(l&&!l.thanked&&dayKey(l.t)<t){l.thanked=true;l.thankedAt=Date.now();s.unread=true;ch=true;bloom(s);
    saveUser({['sampleLetters.'+s.id+'.thanked']:true})}}
@@ -791,7 +800,7 @@ async function receiveWithRetry(id,x,y,t){
  return null}
 let delivering=false;
 async function receiveSeeds(){if(!FB||delivering||!ready||!practiceDone())return;delivering=true;
- try{const t=dayKey(Date.now());let n=U.receivedDate===t?U.receivedToday:0;if(n>=DAILY_RECEIVE)return;
+ try{const t=dayKey(clock());let n=U.receivedDate===t?U.receivedToday:0;if(n>=DAILY_RECEIVE)return;
   // ほかの人に先を越されることもあるので、候補は多めに取り、足りなければ探しなおす
   for(let round=0;round<3&&n<DAILY_RECEIVE;round++){
   const ids=await findDeliverable(new Set(S.seeds.map(s=>s.id)),(DAILY_RECEIVE-n)*4).catch(e=>{console.error('[findDeliverable]',e);return[]});if(!ids.length)break;
