@@ -191,6 +191,22 @@ export function reportSeed(seedId) {
   return b.commit().catch(e => console.error('[reportSeed]', e));
 }
 
+/**
+ * 自分の種を抜く：種そのもの・届いた手紙・自分の世界のタイルを、1 つのバッチで消す。
+ * 届いた先の世界では、次に開いたときに種が読めなくなり、見えなくなる。
+ */
+export async function pullSeed(seedId) {
+  if (!myUid) return;
+  try {
+    const letters = await getDocs(collection(db, 'seeds', seedId, 'letters'));
+    const b = writeBatch(db);
+    letters.docs.forEach(d => b.delete(d.ref));
+    b.delete(doc(db, 'seeds', seedId));
+    b.delete(doc(db, 'worlds', myUid, 'tiles', seedId));
+    await b.commit();
+  } catch (e) { console.error('[pullSeed]', e); }
+}
+
 /** 自分の種に届いた手紙を知らせる：運営に知らせて、自分の画面には出さない（users.muted）。 */
 export function reportLetter(seedId, writerUid) {
   if (!myUid) return Promise.resolve();

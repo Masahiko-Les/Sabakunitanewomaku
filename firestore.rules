@@ -148,7 +148,8 @@ service cloud.firestore {
         && countedOne(get(/databases/$(db)/documents/users/$(me())).data,
                       getAfter(/databases/$(db)/documents/users/$(me())).data);
 
-      allow delete: if false;
+      // 抜く：蒔いた人だけが、自分の種を消せる
+      allow delete: if signedIn() && resource.data.ownerUid == me();
 
       // 手紙：ドキュメント ID＝書いた人の uid（1 つの種に 1 人 1 回）
       match /letters/{writer} {
@@ -181,7 +182,8 @@ service cloud.firestore {
           // ありがとうを返せるのも、蒔いてから 1 週間まで
           && request.time < seed().createdAt + duration.value(7, 'd');
 
-        allow delete: if false;
+        // 種を抜くとき、蒔いた人が届いた手紙もいっしょに消す
+        allow delete: if signedIn() && seed().ownerUid == me();
       }
     }
 

@@ -1,5 +1,5 @@
 // ルール確認：手紙とありがとう。前提：Emulator が動いていること（npm run test:rules）
-import { doc, collection, getDoc, getDocs, setDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, collection, getDoc, getDocs, setDoc, updateDoc, deleteDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { client, plant, deliver, adminPatch, expect, done } from './rules-lib.mjs';
 
 const [A, B, C, D] = await Promise.all(['A', 'B', 'C', 'D'].map(client));
@@ -56,5 +56,21 @@ await expect(false, '1 週間を過ぎてから、届いた種に手紙を書く
 await expect(false, '1 週間を過ぎてから、ありがとうを返す', () => updateDoc(L(A, W, C.uid), { thanked: true, thankedAt: serverTimestamp() }));
 await expect(true, '1 週間を過ぎても、蒔いた人は手紙を読める', () => getDocs(collection(A.db, 'seeds', W, 'letters')));
 await expect(true, '1 週間を過ぎても、書いた人は自分の手紙を読める', () => getDoc(L(C, W)));
+
+// 抜く：蒔いた人が、種・届いた手紙・自分のタイルをいっしょに消す
+const P = await plant(A);
+await deliver(B, P); await deliver(D, P);
+await setDoc(L(B, P), letter(B)); await setDoc(L(D, P), letter(D));
+await expect(false, 'B が A の種を抜く', () => deleteDoc(doc(B.db, 'seeds', P)));
+await expect(false, 'D が B の手紙を消す', () => deleteDoc(L(D, P, B.uid)));
+await expect(false, 'B が自分の手紙を消す（抜くのは蒔いた人だけ）', () => deleteDoc(L(B, P)));
+await expect(true, 'A が自分の種を抜く（手紙・種・タイルを 1 つのバッチで）', async () => {
+  const b = writeBatch(A.db);
+  (await getDocs(collection(A.db, 'seeds', P, 'letters'))).docs.forEach(d => b.delete(d.ref));
+  b.delete(doc(A.db, 'seeds', P)); b.delete(doc(A.db, 'worlds', A.uid, 'tiles', P));
+  return b.commit();
+});
+await expect(false, '抜いたあと、届いた先（B）では種を読めない', () => getDoc(doc(B.db, 'seeds', P)));
+await expect(false, '抜いたあと、B は手紙を書けない', () => setDoc(L(B, P), letter(B, { text: 'もう一度' })));
 
 done();

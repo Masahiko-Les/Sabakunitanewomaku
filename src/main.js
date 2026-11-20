@@ -1,6 +1,6 @@
 import './style.css';
 import { enabled as FB, initUser, saveUser, loadMyWorld, plantSeed, findDeliverable, receiveSeed,
-  getUid, watchLetters, watchMyLetter, writeLetter, thankLetter, resetAll, reportSeed, reportLetter } from './firebase.js';
+  getUid, watchLetters, watchMyLetter, writeLetter, thankLetter, resetAll, reportSeed, reportLetter, pullSeed } from './firebase.js';
 import { startOpening, grandmaLines, arrivalLines } from './opening/opening.js';
 import { PLANT_TALK, PLANT_BUTTONS, PLANT_PLACEHOLDERS } from './talk/plant.js';
 
@@ -488,9 +488,14 @@ function openMine(s){
  const body=`<div class="kicker">あなたの種</div>${seedCard(s)}
  <p class="state">${s.hidden?'この種は、ほかの人には見えない場所に置いてあります':stageText[stageOf(s)]}</p>
  ${s.letters.length?`<div class="sec">届いた手紙</div>${letters}`:`<p class="empty">まだ手紙は届いていません。誰かが通りかかるのを、静かに待っています。</p>`}
+ <div class="row" style="justify-content:flex-start;margin-top:8px"><button class="btn ghost small" id="pull" style="padding-left:0">抜く</button></div>
  <div class="row"><button class="btn soft small" id="x">閉じる</button></div>`;
  markSeen(s);
  openSheet(body,el=>{el.querySelector('#x').onclick=closeSheet;
+  // 抜く：1 回目で「本当に抜く」、もう一度押すと、みんなの世界から消す
+  const pl=el.querySelector('#pull');pl.onclick=()=>{if(!pl.dataset.c){pl.dataset.c=1;pl.textContent='本当に抜く';return}
+   if(pl.dataset.busy)return;pl.dataset.busy=1;
+   stopWatch(s.id);if(FB)pullSeed(s.id);S.seeds=S.seeds.filter(z=>z!==s);save();rebuildWorld();refreshDot();closeSheet();toast('種を抜きました')};
   el.querySelectorAll('[data-rep]').forEach(b=>b.onclick=()=>{if(!b.dataset.c){b.dataset.c=1;b.textContent='本当に知らせる';return}
    const w=b.dataset.rep;MUTED[s.id+'_'+w]=true;reportLetter(s.id,w);s.letters=s.letters.filter(z=>z.id!==w);save();rebuildWorld();refreshDot();openMine(s);toast('知らせました。この手紙は、もう表示されません')});
   el.querySelectorAll('[data-thx]').forEach(b=>b.onclick=()=>{const l=s.letters.find(z=>z.id===b.dataset.thx);if(!l)return;l.thanked=true;l.thankedAt=Date.now();save();thankLetter(s.id,l.id);

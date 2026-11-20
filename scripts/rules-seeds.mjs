@@ -42,7 +42,7 @@ await expect(false, 'マスが範囲外', () => plantBatch(A, {}, { x: 100 }).co
 // 書き換え・削除
 await expect(false, 'A が自分の種を書き換える', () => updateDoc(doc(A.db, 'seeds', pub.ref.id), { h: '書き換え' }));
 await expect(false, 'A が自分の種を hidden から public にする', () => updateDoc(doc(A.db, 'seeds', hid.ref.id), { status: 'public', open: true }));
-await expect(false, 'A が自分の種を消す', () => deleteDoc(doc(A.db, 'seeds', pub.ref.id)));
+await expect(false, 'B が A の種を消す', () => deleteDoc(doc(B.db, 'seeds', pub.ref.id)));
 await expect(false, 'A が自分のタイルを動かす', () => updateDoc(doc(A.db, 'worlds', A.uid, 'tiles', pub.ref.id), { x: 10 }));
 await expect(false, 'B が A の世界のタイルを消す', () => deleteDoc(doc(B.db, 'worlds', A.uid, 'tiles', pub.ref.id)));
 
@@ -68,8 +68,8 @@ await adminPatch(`seeds/${full}`, { status: { stringValue: 'hidden' } });
 await expect(false, '届いた人（D）が、管理者が hidden にした種を読む', () => getDoc(doc(five[0].db, 'seeds', full)));
 await expect(true, '蒔いた本人（A）は、管理者が hidden にした種を読める', () => getDoc(doc(A.db, 'seeds', full)));
 
-// 「すべてのデータを消す」：自分の世界のタイルは消せる。種そのものは消せない
+// 「すべてのデータを消す」：自分の世界のタイルは消せる。種そのものも、蒔いた本人は「抜く」で消せる
 await expect(true, 'A が自分の世界のタイルを消す（すべてのデータを消す）', () => deleteDoc(doc(A.db, 'worlds', A.uid, 'tiles', pub.ref.id)));
-await expect(false, 'タイルを消したあとも、種そのものは消せない', () => deleteDoc(doc(A.db, 'seeds', pub.ref.id)));
+await expect(true, '蒔いた本人は、種そのものを消せる（抜く）', () => deleteDoc(doc(A.db, 'seeds', pub.ref.id)));
 
 done();
