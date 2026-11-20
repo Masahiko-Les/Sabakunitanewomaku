@@ -487,7 +487,7 @@ function openMine(s){
   <div class="act">${FB&&l.from!=='me'?`<button class="btn ghost small" data-rep="${l.id}" style="margin-right:auto;padding-left:0">この手紙を知らせる</button>`:''}${l.thanked?'ありがとうを返しました':expired(s)?'':`<button class="btn main small" data-thx="${l.id}">ありがとう</button>`}</div></div>`).join('');
  const body=`<div class="kicker">あなたの種</div>${seedCard(s)}
  <p class="state">${s.hidden?'この種は、ほかの人には見えない場所に置いてあります':stageText[stageOf(s)]}</p>
- ${s.letters.length?`<div class="sec">届いた手紙</div>${letters}`:`<p class="empty">まだ手紙は届いていません。誰かが通りかかるのを、静かに待っています。</p>`}
+ ${s.letters.length?`<div class="sec">届いた手紙</div>${letters}`:`<p class="empty">まだ水やりされていません。誰かが通りかかるのを、静かに待っています。</p>`}
  <div class="row" style="justify-content:flex-start;margin-top:8px"><button class="btn ghost small" id="pull" style="padding-left:0">抜く</button></div>
  <div class="row"><button class="btn soft small" id="x">閉じる</button></div>`;
  markSeen(s);
