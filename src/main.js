@@ -409,6 +409,10 @@ const CAN_ICON='<svg class="canicon" viewBox="0 0 30 22" aria-hidden="true"><pat
 const SEED_ICON='<svg class="seedicon" viewBox="-14 -4 28 14" aria-hidden="true"><ellipse cx="0" cy="4" rx="13" ry="5.5" fill="#d8b07c"/><ellipse cx="0" cy="3" rx="11" ry="4" fill="#e2bf8c"/><ellipse cx="0" cy="2" rx="3.2" ry="2.3" fill="#8a6440"/></svg>';
 // 芽が出た種の見出しには、マップと同じ芽の絵（土＋茎＋双葉）
 const SPROUT_ICON='<svg class="seedicon sprout" viewBox="-14 -14 28 24" aria-hidden="true"><ellipse cx="0" cy="4" rx="13" ry="5.5" fill="#d8b07c"/><ellipse cx="0" cy="3" rx="11" ry="4" fill="#e2bf8c"/><path d="M0 3 L0 -6" stroke="#6f9a5e" stroke-width="1.8" stroke-linecap="round"/><ellipse cx="-4" cy="-7" rx="4.5" ry="2.2" transform="rotate(28.6 -4 -7)" fill="#86b874"/><ellipse cx="4" cy="-8" rx="4.5" ry="2.2" transform="rotate(-28.6 4 -8)" fill="#86b874"/></svg>';
+// 花が咲いた種の見出しには、マップと同じ花の絵（茎・葉・その種の花の色）。白い花はシートの地に溶けないよう、花びらに細い縁
+function flowerIcon(type){const F=FLOWERS[type%5];let petals='';
+ for(let i=0;i<F.n;i++)petals+=`<ellipse cx="0" cy="-4.6" rx="2.8" ry="4.6" transform="rotate(${(i/F.n*360).toFixed(1)})" fill="${F.p}" stroke="#e3d3b8" stroke-width=".5"/>`;
+ return `<svg class="seedicon sprout" viewBox="-12 -13 24 24" aria-hidden="true"><path d="M0 10 Q1 4 0 -2" stroke="#6f9a5e" stroke-width="1.8" stroke-linecap="round" fill="none"/><ellipse cx="-3" cy="6" rx="4" ry="1.8" transform="rotate(-34.4 -3 6)" fill="#7fae6b"/><g transform="translate(0 -3)">${petals}<circle r="2.6" fill="${F.c}"/></g></svg>`}
 // 種カード：本文だけ。② があるときは、区切りの下に
 function seedCard(s){return `<div class="parchment"><p class="hard">${esc(s.h)}</p>${s.f?`<div class="psep"></div><p class="face">${esc(s.f)}</p>`:''}</div>`}
 $('#btnPlant').onclick=()=>{if(!ready||inputLocked())return;const pi=plantState();if(!pi.ok)return;plantTalk(pi,{h:'',f:''})};
@@ -524,8 +528,8 @@ function drawGust(t){if(!gust)return;const I=gust.I;
 const stageText={seed:'まだ、水を待っています',sprout:'芽が出ています',flower:'花が咲いています'};
 function openSeed(s){if(s.mine)return openMine(s);if(s.granny)return openGrannySeed(s);
  const mine=myLetter(s);
- // 誰かの種：種のとき・芽のときは状態を文字で書かず、見出しの絵（種／芽）でわかるようにする。花のときだけ「花が咲いています」
- let body=`<div class="kicker seedk">${stageOf(s)==='sprout'?SPROUT_ICON:SEED_ICON}誰かの種</div>${seedCard(s)}${stageOf(s)==='flower'?`<p class="state">${stageText.flower}</p>`:''}`;
+ // 誰かの種：状態は文字で書かず、見出しの絵（種／芽／花）でわかるようにする
+ let body=`<div class="kicker seedk">${stageOf(s)==='flower'?flowerIcon(s.flower||0):stageOf(s)==='sprout'?SPROUT_ICON:SEED_ICON}誰かの種</div>${seedCard(s)}`;
  if(!mine&&(S.tutorial||0)<3){body+=`<p class="note">水やりは、焚き火のそばのおばあちゃんに教わってからにしよう。</p><div class="row"><button class="btn soft small" id="x">閉じる</button></div>`}
  else if(!mine){body+=`<label class="wlabel">${CAN_ICON}やさしい言葉で、水をあげる（10行まで）</label><textarea id="tL" rows="5" maxlength="300" placeholder="アドバイスより、まずは受けとめる言葉を"></textarea><div class="count" id="cL"></div>
   ${s.sample?'':'<p class="note">手紙は、この種を蒔いた人にだけ届きます。ほかの人には見えません。</p>'}
