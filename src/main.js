@@ -420,6 +420,8 @@ const SPROUT_ICON='<svg class="seedicon sprout" viewBox="-14 -14 28 24" aria-hid
 function flowerIcon(type){const F=FLOWERS[type%5];let petals='';
  for(let i=0;i<F.n;i++)petals+=`<ellipse cx="0" cy="-4.6" rx="2.8" ry="4.6" transform="rotate(${(i/F.n*360).toFixed(1)})" fill="${F.p}" stroke="#e3d3b8" stroke-width=".5"/>`;
  return `<svg class="seedicon sprout" viewBox="-12 -13 24 24" aria-hidden="true"><path d="M0 10 Q1 4 0 -2" stroke="#6f9a5e" stroke-width="1.8" stroke-linecap="round" fill="none"/><ellipse cx="-3" cy="6" rx="4" ry="1.8" transform="rotate(-34.4 -3 6)" fill="#7fae6b"/><g transform="translate(0 -3)">${petals}<circle r="2.6" fill="${F.c}"/></g></svg>`}
+// 見出しの絵：種・芽・花の段階に合わせる（誰かの種・おばあちゃんの種）
+const stageIcon=s=>{const st=stageOf(s);return st==='flower'?flowerIcon(s.flower||0):st==='sprout'?SPROUT_ICON:SEED_ICON};
 // 種カード：本文だけ。② があるときは、区切りの下に
 function seedCard(s){return `<div class="parchment"><p class="hard">${esc(s.h)}</p>${s.f?`<div class="psep"></div><p class="face">${esc(s.f)}</p>`:''}</div>`}
 $('#btnPlant').onclick=()=>{if(!ready||inputLocked())return;const pi=plantState();if(!pi.ok)return;plantTalk(pi,{h:'',f:''})};
@@ -536,7 +538,7 @@ const stageText={seed:'まだ、水を待っています',sprout:'芽が出て�
 function openSeed(s){if(s.mine)return openMine(s);if(s.granny)return openGrannySeed(s);
  const mine=myLetter(s);
  // 誰かの種：状態は文字で書かず、見出しの絵（種／芽／花）でわかるようにする
- let body=`<div class="kicker seedk">${stageOf(s)==='flower'?flowerIcon(s.flower||0):stageOf(s)==='sprout'?SPROUT_ICON:SEED_ICON}誰かの種</div>${seedCard(s)}`;
+ let body=`<div class="kicker seedk">${stageIcon(s)}誰かの種</div>${seedCard(s)}`;
  if(!mine&&(S.tutorial||0)<3){body+=`<p class="note">水やりは、焚き火のそばのおばあちゃんに教わってからにしよう。</p><div class="row"><button class="btn soft small" id="x">閉じる</button></div>`}
  else if(!mine){body+=`<label class="wlabel">${CAN_ICON}やさしい言葉で、水をあげる（10行まで）</label><textarea id="tL" rows="5" maxlength="300" placeholder="アドバイスより、まずは受けとめる言葉を"></textarea><div class="count" id="cL"></div>
   ${s.sample?'':'<p class="note">手紙は、この種を蒔いた人にだけ届きます。ほかの人には見えません。</p>'}
@@ -678,7 +680,7 @@ function grannyThanks(){talkSheet(({play,button})=>play(TUT.reading,()=>button('
  closeSheet();if(g)bloom(g);
  setTimeout(()=>talkSheet(({play,button})=>play(TUT.finish,()=>button('はじめる',finishTutorial))),3200)})))}
 function openGrannySeed(s){const mine=myLetter(s),tu=S.tutorial||0;
- let body=`<div class="kicker seedk">${SEED_ICON}おばあちゃんの種</div>${seedCard(s)}`;
+ let body=`<div class="kicker seedk">${stageIcon(s)}おばあちゃんの種</div>${seedCard(s)}`;
  if(!mine&&tu>=1){body+=`<div class="care" style="font-size:13.5px;line-height:1.95"><b style="font-weight:500">水やりのこつ</b><br>・まずは、気持ちを受けとめる<br>　（「それは、さみしいですね」）<br>・向き合い方の、よいところを伝える<br>　（「その考え方、すてきです」）<br>・アドバイスは、しなくて大丈夫</div>
   <label class="wlabel">${CAN_ICON}やさしい言葉で、水をあげる（10行まで）</label><textarea id="tL" rows="5" maxlength="300" placeholder="たとえば：できることを数えるって、すてきですね。"></textarea><div class="count" id="cL"></div>
   <div class="row"><button class="btn ghost small" id="x">閉じる</button><button class="btn main small" id="ok" disabled>水をあげる</button></div>`}
