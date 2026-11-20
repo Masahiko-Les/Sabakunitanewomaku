@@ -9,7 +9,7 @@ export async function sowSeed(page, h, f, { crisis = false } = {}) {
   await page.locator('#pPlant').waitFor({ state: 'visible' });
   await page.click('#pPlant');
   if (crisis) { await page.waitForTimeout(1500); return; }
-  // 種が落ちる → 風が運ぶ → おばあちゃんのひと言 →「閉じる」
-  await page.locator('#bt').waitFor({ state: 'visible', timeout: 10000 });
-  await page.click('#bt'); await page.waitForTimeout(500);
+  // 種が落ちる → 強い風が綿毛を運ぶ → 最後のトーストまで待つ（演出中はカメラが揺れるので、タップの位置がずれないように）
+  for (let i = 0; i < 200; i++) { if ((await page.textContent('#toast')).includes('きっと届くさ')) break; await page.waitForTimeout(50); }
+  await page.waitForTimeout(300);
 }

@@ -77,22 +77,26 @@ card = await page.textContent('#talk .preview');
 check(card.includes('ことがある。'), '直した内容がプレビューに出る');
 
 await page.click('#pPlant');
+const t0 = Date.now();
 await page.waitForTimeout(400);
-check(!(await page.evaluate(() => document.querySelector('#sheet').classList.contains('on'))), '蒔くと、シートが閉じて演出が始まる');
+check(!(await page.evaluate(() => document.querySelector('#sheet').classList.contains('on'))), '蒔くと、シートが閉じる');
 await shot('4_fall');
-await page.waitForTimeout(1800);
-await shot('5_wind');
-await page.locator('#bt').waitFor({ state: 'visible', timeout: 6000 });
-b = await bubs();
-check(b.length === 1 && b[0].t === PLANT_TALK.sent, '風のあと：「……ほら、風が吹いてきた。…」');
-await shot('6_sent');
-await page.click('#bt'); await page.waitForTimeout(500);
-check(!(await page.evaluate(() => document.querySelector('#sheet').classList.contains('on'))), '閉じると砂漠に戻る');
+const toastText = () => page.textContent('#toast');
+const waitToast = async (txt, ms) => { const end = Date.now() + ms; while (Date.now() < end) { if ((await toastText()) === txt) return Date.now() - t0; await page.waitForTimeout(50); } return -1; };
+const tStart = await waitToast(PLANT_TALK.gustStart, 4000);
+check(tStart > 900 && tStart < 2500, `風が吹き始めて、トースト「${PLANT_TALK.gustStart}」（${tStart}ms）`);
+await page.waitForTimeout(800); await shot('5_gust');
+await page.waitForTimeout(900); await shot('6_fluff');
+const tEnd = await waitToast(PLANT_TALK.gustEnd, 9000);
+check(tEnd > 5500, `風がおさまり綿毛が出ていったら、トースト「${PLANT_TALK.gustEnd}」（${tEnd}ms）`);
+await shot('6_end');
+check(!(await page.evaluate(() => document.querySelector('#sheet').classList.contains('on'))), '演出のあいだも、シートは開かない（砂漠のまま）');
 const tiles = ((await (await fetch(`${FS}/worlds/${me}/tiles`, { headers: OWNER })).json()).documents || []);
 const id1 = tiles[0]?.name.split('/').pop();
 const s1 = (await getRaw(`seeds/${id1}`))?.fields || {};
 check(s1.h?.stringValue === '人前で話すとき、言葉が出てこないことがある。' && s1.f?.stringValue === 'ゆっくり話すようにしている。', 'Firestore：h と f が保存された');
 
+const waitToast2 = async txt => { for (let i = 0; i < 200; i++) { if ((await page.textContent('#toast')) === txt) return; await page.waitForTimeout(50); } };
 // ── 2 つ目：「いまはいいや」（再読み込みして、初期位置からとなりのマス (52,48) へ）
 await page.reload({ waitUntil: 'load' }); await boot();
 await page.mouse.click(285, 213); await page.waitForTimeout(3500);
@@ -108,7 +112,7 @@ check(i > 0 && b[i + 1]?.t === PLANT_TALK.skipped && b[i + 2]?.t === PLANT_TALK.
 check(!(await page.$('#talk .preview .psep')), 'プレビュー：② がないので区切りもない');
 await shot('7_skip_preview');
 await page.click('#pPlant');
-await page.locator('#bt').waitFor({ state: 'visible', timeout: 8000 }); await page.click('#bt'); await page.waitForTimeout(800);
+await waitToast2(PLANT_TALK.gustEnd);
 const tiles2 = ((await (await fetch(`${FS}/worlds/${me}/tiles`, { headers: OWNER })).json()).documents || []).map(d => d.name.split('/').pop());
 const id2 = tiles2.find(x => x !== id1);
 const s2 = (await getRaw(`seeds/${id2}`))?.fields || {};

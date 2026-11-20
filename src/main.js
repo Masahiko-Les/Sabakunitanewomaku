@@ -189,6 +189,7 @@ function update(dt,now){
   if(hit&&target&&(b1&&b2||hit==='storm')){target=null;pendingOpen=null}}
  if(Math.hypot(P.x-lastStep.x,P.y-lastStep.y)>16){prints.push({x:P.x,y:P.y+11,t:now,side:prints.length%2});lastStep={x:P.x,y:P.y};if(prints.length>60)prints.shift()}
  const tx=clamp(P.x-vw/2,0,WORLD-vw),ty=clamp(P.y-vh*.45,0,WORLD-vh),k=Math.min(1,dt*5);cam.x+=(tx-cam.x)*k;cam.y+=(ty-cam.y)*k;
+ updateGust(dt,now); // 種を蒔いたあとの強い風（カメラの揺れは、プレイヤーを追ったあとに足す）
  if(Math.random()<dt*14)sparks.push({x:FIRE.x+(Math.random()-.5)*10,y:FIRE.y-12,vx:(Math.random()-.5)*14,vy:-30-Math.random()*40,t:0,life:.9+Math.random()*.9});
  for(const p of sparks){p.t+=dt;p.x+=p.vx*dt+Math.sin(p.t*6)*.3;p.y+=p.vy*dt}
  while(sparks.length&&sparks[0].t>sparks[0].life)sparks.shift();
@@ -329,12 +330,15 @@ function draw(t){ctx.setTransform(dpr,0,0,dpr,0,0);ctx.globalCompositeOperation=
   for(const f of flies){const a=f.a+t/1000*f.s,x=VC.x+Math.cos(a)*f.r+Math.sin(t/900+f.ph)*12,y=VC.y+Math.sin(a*1.3)*f.r*.6+Math.cos(t/700+f.ph)*10;const b=(.5+.5*Math.sin(t/400+f.ph))*night;
    glow(x,y,9,'200,255,140',.5*b);ell(x,y,1.2,1.2,`rgba(235,255,190,${b})`)}
   ctx.restore();ctx.globalCompositeOperation='source-over'}
- ctx.save();ctx.translate(-cam.x,-cam.y);if(vis(FIRE.x,FIRE.y))drawFlames(t);
+ ctx.save();ctx.translate(-cam.x,-cam.y);if(vis(FIRE.x,FIRE.y)){ctx.save();
+  // 強い風のあいだ、焚き火の炎が風の強さに合わせてなびく
+  if(gust){ctx.translate(FIRE.x,FIRE.y);ctx.transform(1,0,-0.75*gust.I,1,0,0);ctx.translate(-FIRE.x,-FIRE.y)}
+  drawFlames(t);ctx.restore()}
  if((S.tutorial||0)===1){const g=S.seeds.find(s=>s.granny);if(g){const ax=(g.x+.5)*TILE,ay=(g.y+.5)*TILE-24+Math.sin(t/300)*4;ctx.fillStyle='rgba(217,130,91,.95)';ctx.beginPath();ctx.moveTo(ax-7,ay-9);ctx.lineTo(ax+7,ay-9);ctx.lineTo(ax,ay+1);ctx.closePath();ctx.fill()}}
  if(!sheetOpen&&Math.hypot(P.x-GRAN.x,P.y-GRAN.y)<230){const bx=GRAN.x+2,by=GRAN.y-40+Math.sin(t/500)*1.5;
   ctx.fillStyle='rgba(255,252,245,.95)';ctx.beginPath();ctx.roundRect(bx-15,by-10,30,18,9);ctx.fill();ctx.beginPath();ctx.moveTo(bx-3,by+7);ctx.lineTo(bx,by+12);ctx.lineTo(bx+3,by+7);ctx.fill();
   for(let i=-1;i<=1;i++)ell(bx+i*7,by-1,1.7,1.7,`rgba(138,117,96,${.45+.55*((Math.floor(t/350)%3)===i+1)})`)}
- ctx.restore();drawWind(t)}
+ ctx.restore();drawFall(t);drawGust(t)}
 function drawGranny(t){const x=GRAN.x,y=GRAN.y,br=Math.sin(t/900)*.6;
  ell(x,y+11,14,4.5,'rgba(60,50,40,.22)');
  ctx.fillStyle='#8a5e3e';ctx.beginPath();ctx.roundRect(x-11,y+2,22,8,3);ctx.fill();ell(x+11,y+6,2.5,4,'#a87a55');
@@ -392,27 +396,67 @@ function sow(pi,draft){if(seedOn(pi.tx,pi.ty)){closeSheet();return}
  const h=draft.h,f=draft.f||null,crisis=CRISIS.test(h+(f||''));
  const sd={x:pi.tx,y:pi.ty,h,f,flower:Math.floor(Math.random()*5),hidden:crisis};
  const fx=performance.now();
- const pr=plantSeed(sd),ns={id:pr.id||uid(),...sd,mine:true,t:Date.now(),letters:[],plantedAt:fx+WIND.fall};S.seeds.push(ns);save();
+ const pr=plantSeed(sd),ns={id:pr.id||uid(),...sd,mine:true,t:Date.now(),letters:[],plantedAt:fx+SEED_FALL};S.seeds.push(ns);save();
  if(pr.id)pr.done.then(()=>watchOwn(ns));
  const sx=(pi.tx+.5)*TILE,from={x:P.x,y:P.y-14};for(const dx of[-TILE*.75,TILE*.75]){if(!solid(sx+dx,P.y+10)){P.x=sx+dx;break}}
  if(crisis){openSheet(`<div class="kicker">種を預かりました</div>${careHTML()}<p class="note">この種は、ほかの人には見えない場所にそっと置いておきます。（公開版では、管理者が確認してから扱いを決める想定です）</p><div class="row"><button class="btn main small" id="x">閉じる</button></div>`,e=>e.querySelector('#x').onclick=closeSheet);return}
- // 種が地面に落ち、風が吹いて、種が画面の外へ運ばれていく → おばあちゃんのひと言 → 砂漠に戻る
- closeSheet();windFx={t0:fx,from,x:sx,y:(pi.ty+.5)*TILE+2,seeds:Array.from({length:5},(_,i)=>({dy:-30-i*16+Math.random()*10,ph:Math.random()*6,d:i*120}))};
- setTimeout(()=>{windFx=null;talkSheet(({play,button})=>play([PLANT_TALK.sent],()=>button(PLANT_BUTTONS.close,closeSheet)))},WIND.total)}
-const WIND={fall:700,blowAt:1000,total:4200};
-let windFx=null;
-function drawWind(t){const w=windFx;if(!w)return;const e=t-w.t0;ctx.save();ctx.translate(-cam.x,-cam.y);
- // 1. 手もとから、マスへ落ちる
- if(e<WIND.fall){const k=clamp(e/WIND.fall,0,1),ease=k*k;const x=w.from.x+(w.x-w.from.x)*k,y=w.from.y+(w.y-w.from.y)*ease-Math.sin(k*Math.PI)*10;ell(x,y,3.2,2.3,'#8a6440')}
- // 2. 風が吹いて、小さな種が画面の外へ運ばれていく
- const b=e-WIND.blowAt;
- if(b>0){const span=WIND.total-WIND.blowAt,a=clamp(Math.min(b/400,(span-b)/500),0,1);
-  ctx.lineCap='round';ctx.lineWidth=1.4;
-  for(let i=0;i<9;i++){const yy=w.y-120+i*34+Math.sin(i*2.3)*12,xx=cam.x-160+((b*.55+i*137)%(vw+320)),len=60+(i%3)*24;
-   ctx.strokeStyle=`rgba(255,250,235,${.45*a})`;ctx.beginPath();ctx.moveTo(xx,yy);ctx.quadraticCurveTo(xx+len*.5,yy-6,xx+len,yy);ctx.stroke()}
-  for(const s of w.seeds){const k=clamp((b-s.d)/(span-500),0,1);if(k<=0||k>=1)continue;
-   const x=w.x+Math.pow(k,1.8)*(vw*.9+160),y=w.y+s.dy*Math.min(1,k*3)-k*90+Math.sin(k*9+s.ph)*8;
-   glow(x,y,11,'255,240,200',.45*(1-k*.5)*(.5+night*.5));ell(x,y,2.9,2.1,'#8a6440')}}
+ // 種が手もとからマスへ落ち（0.7 秒）、シートが閉じて約 0.9 秒後に、強い風が綿毛を 5 つの世界へ運んでいく
+ closeSheet();fallFx={t0:fx,from,x:sx,y:(pi.ty+.5)*TILE+2};setTimeout(()=>{fallFx=null;startGust(ns)},900)}
+const SEED_FALL=700;
+let fallFx=null;
+function drawFall(t){const w=fallFx;if(!w)return;const k=clamp((t-w.t0)/SEED_FALL,0,1);if(k>=1)return;
+ const x=w.from.x+(w.x-w.from.x)*k,y=w.from.y+(w.y-w.from.y)*k*k-Math.sin(k*Math.PI)*10;
+ ctx.save();ctx.translate(-cam.x,-cam.y);ell(x,y,3.2,2.3,'#8a6440');ctx.restore()}
+/* ---------- gust (種を蒔いたあとの強い風) ---------- */
+let gust=null;
+const GUST_N=5; // 綿毛の数（他の人の世界へ届く数）
+function gustLevel(e){if(e<.9)return 1-Math.pow(1-e/.9,3);if(e<3.8)return 1;if(e<5.2)return 1-(e-3.8)/1.4;return 0}
+function startGust(s){const sx=(s.x+.5)*TILE,sy=(s.y+.5)*TILE;
+ gust={t0:performance.now(),sx,sy,I:0,said:false,flash:0,
+  fl:Array.from({length:GUST_N},(_,i)=>({d:1.0+i*.32+Math.random()*.12,on:false,x:sx,y:sy,vx:0,vy:0,rot:Math.random()*6,wob:Math.random()*6.28,sz:.85+Math.random()*.3})),
+  st:Array.from({length:240},()=>({x:Math.random()*vw*1.5-vw*.5,y:Math.random()*(vh+200)-150,v:900+Math.random()*700,len:30+Math.random()*90,w:.8+Math.random()*2.2,dk:Math.random()<.6})),
+  cl:Array.from({length:12},()=>({x:Math.random()*vw*1.6-vw*.6,y:Math.random()*(vh+300)-200,r:140+Math.random()*220,v:500+Math.random()*400,a:.25+Math.random()*.3}))}}
+function updateGust(dt,now){if(!gust)return;const e=(now-gust.t0)/1000,I=gustLevel(e);gust.I=I;gust.e=e;
+ if(!gust.said&&e>.5){gust.said=true;toast(PLANT_TALK.gustStart)}
+ for(const p of gust.st){p.x+=p.v*I*dt;p.y+=p.v*.28*I*dt;if(p.x>vw+120||p.y>vh+120){p.x=-120-Math.random()*vw*.5;p.y=Math.random()*(vh+200)-200}}
+ for(const c of gust.cl){c.x+=c.v*I*dt;c.y+=c.v*.28*I*dt;if(c.x-c.r>vw||c.y-c.r>vh){c.x=-c.r-Math.random()*vw*.4;c.y=Math.random()*(vh+200)-c.r}}
+ cam.x+=(Math.random()-.5)*4*I;cam.y+=(Math.random()-.5)*3*I;
+ gust.flash=Math.max(0,gust.flash-dt*2.5);
+ let alive=0;
+ for(const f of gust.fl){
+  if(!f.on){if(e>f.d){f.on=true;f.vx=10;f.vy=-70;gust.flash=1}else{alive++;continue}}
+  const W=Math.max(I,.25);
+  f.vx+=(W*480-f.vx*.55)*dt;f.vy+=(18+Math.sin(e*3.2+f.wob)*90)*dt;f.vy*=.98;
+  f.x+=f.vx*dt;f.y+=f.vy*dt;f.rot+=dt*(2+f.vx/160);
+  const sx=f.x-cam.x,sy=f.y-cam.y;if(sx<vw+60&&sx>-60&&sy>-60&&sy<vh+60)alive++}
+ if(e>5.3&&!alive){gust=null;toast(PLANT_TALK.gustEnd)}}
+function drawFluff(x,y,s,rot,t){
+ ctx.save();ctx.translate(x,y);ctx.rotate(Math.sin(rot)*.5);ctx.scale(s,s);
+ const g=ctx.createRadialGradient(0,0,0,0,0,22);g.addColorStop(0,`rgba(255,236,180,${.55+.35*night})`);g.addColorStop(1,'rgba(255,236,180,0)');
+ ctx.globalCompositeOperation='lighter';ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,22,0,Math.PI*2);ctx.fill();ctx.globalCompositeOperation='source-over';
+ ctx.strokeStyle='rgba(255,252,240,.95)';ctx.fillStyle='#fffbea';ctx.lineWidth=.9;ctx.lineCap='round';
+ for(let k=0;k<12;k++){const a=k/12*Math.PI*2+rot*.2,r=9+((k%2)?1.5:0),ex=Math.cos(a)*r,ey=Math.sin(a)*r-2;
+  ctx.beginPath();ctx.moveTo(0,-2);ctx.lineTo(ex,ey);ctx.stroke();ctx.beginPath();ctx.arc(ex,ey,1.1,0,Math.PI*2);ctx.fill()}
+ ctx.strokeStyle='rgba(240,225,190,.9)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,-2);ctx.lineTo(0,4);ctx.stroke();
+ ell(0,5.5,2.2,1.6,'#8a6440');
+ ctx.restore()}
+function drawGust(t){if(!gust)return;const I=gust.I;
+ // 砂漠の奥から吹きつける、茶色い砂まじりの空気
+ const dn=1-night*.6;
+ ctx.fillStyle=`rgba(168,118,70,${.42*I*dn})`;ctx.fillRect(0,0,vw,vh);
+ for(const c of gust.cl){const g=ctx.createRadialGradient(c.x,c.y,0,c.x,c.y,c.r);
+  g.addColorStop(0,`rgba(150,100,55,${c.a*I*dn})`);g.addColorStop(.6,`rgba(175,125,75,${c.a*.5*I*dn})`);g.addColorStop(1,'rgba(175,125,75,0)');
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(c.x,c.y,c.r,0,Math.PI*2);ctx.fill()}
+ // 風の筋（濃い茶の砂と、明るい砂）
+ ctx.lineCap='round';
+ for(const p of gust.st){ctx.strokeStyle=p.dk?`rgba(120,80,45,${.55*I*dn})`:`rgba(240,215,175,${(.6-.3*night)*I})`;
+  ctx.lineWidth=p.w;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x-p.len,p.y-p.len*.28);ctx.stroke()}
+ // 種から光がはじける
+ ctx.save();ctx.translate(-cam.x,-cam.y);
+ if(gust.flash>0){const g=ctx.createRadialGradient(gust.sx,gust.sy,0,gust.sx,gust.sy,40);g.addColorStop(0,`rgba(255,240,190,${.7*gust.flash})`);g.addColorStop(1,'rgba(255,240,190,0)');
+  ctx.globalCompositeOperation='lighter';ctx.fillStyle=g;ctx.beginPath();ctx.arc(gust.sx,gust.sy,40,0,Math.PI*2);ctx.fill();ctx.globalCompositeOperation='source-over'}
+ // 綿毛
+ for(const f of gust.fl){if(!f.on)continue;drawFluff(f.x,f.y-6,f.sz,f.rot,t)}
  ctx.restore()}
 
 /* ---------- open seed ---------- */
