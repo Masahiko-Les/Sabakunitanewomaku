@@ -1,7 +1,7 @@
 import './style.css';
 import { enabled as FB, initUser, saveUser, loadMyWorld, plantSeed, findDeliverable, receiveSeed,
   getUid, watchLetters, watchMyLetter, writeLetter, thankLetter, resetAll, reportSeed, reportLetter } from './firebase.js';
-import { startOpening, grandmaLines } from './opening/opening.js';
+import { startOpening, grandmaLines, arrivalLines } from './opening/opening.js';
 
 // 見本の種 8 つを置くか。公開版では置かない（最初は種も花もない）。VITE_USE_SAMPLES=true で試作版と同じく置く
 const USE_SAMPLES = import.meta.env.VITE_USE_SAMPLES === 'true';
@@ -499,8 +499,8 @@ function talkSheet(build){openSheet(`<div class="kicker">焚き火のそばの�
  build({say,you,play,button,ctl,scroll})})}
 function grannySeed(){return S.seeds.find(s=>s.granny)}
 function walkToGrannySeed(){const g=grannySeed();if(!g)return;target={x:(g.x+.5)*TILE+TILE,y:(g.y+.5)*TILE-10};pendingOpen=g.id}
-// 初回講習のはじまり：「おばあちゃんの種を見にいく」
-function goGrannySeed(){S.tutorial=1;S.metGranny=true;save();saveUser({tutorial:1,metGranny:true});closeSheet();walkToGrannySeed()}
+// 初回講習のはじまり：「おばあちゃんの種を見にいく」。自動では歩かず、プレイヤーが自分でおばあちゃんの種を探してタップする
+function goGrannySeed(){S.tutorial=1;S.metGranny=true;save();saveUser({tutorial:1,metGranny:true});closeSheet()}
 function finishTutorial(){S.tutorial=3;S.metGranny=true;save();saveUser({tutorial:3,metGranny:true});closeSheet();setTimeout(()=>toast('緑の上に立って、種を蒔いてみよう'),400)}
 function grannyThanks(){talkSheet(({play,button})=>play(TUT.reading,()=>button('花を見る',()=>{
  const g=grannySeed(),l=g&&myLetter(g);if(l&&!l.thanked){l.thanked=true;l.thankedAt=Date.now();save()}
@@ -656,10 +656,9 @@ function runOpening(){let chose=false;
   onLanding:()=>{sessionNight=true;night=1},
   onLanded:c=>{openingEl=null;try{localStorage.setItem(OPEN_KEY,'1')}catch(e){}
    S.introSeen=true;save();saveUser({openingSeen:true,introSeen:true,...(chose?{}:{interest:null})});U.openingSeen=true;
-   const L=grandmaLines(c);
-   // 到着のことばの最後の台詞のあと、既存の初回講習（おばあちゃんの種に水やり）へ
-   if((S.tutorial||0)===0)talkSheet(({play,button})=>play([...L,...TUT.intro],()=>button('おばあちゃんの種を見にいく',goGrannySeed)));
-   else talkSheet(({play,button})=>play(L,()=>button('はじめる',closeSheet)))}})}
+   // 講習前：到着のことば → 水やりの説明 → おばあちゃんの種へ。講習を始めている人（もう一度見る）：到着のことばだけ
+   if((S.tutorial||0)===0)talkSheet(({play,button})=>play(grandmaLines(c),()=>button('おばあちゃんの種を見にいく',goGrannySeed)));
+   else talkSheet(({play,button})=>play(arrivalLines(c),()=>button('はじめる',closeSheet)))}})}
 
 initUser().then(async u=>{if(u)applyWorld(await loadMyWorld());applyUser(u);startWatchers()}).catch(e=>console.error('[initUser]',e)).finally(()=>{ready=true;sampleThanks();refreshDot();
  // はじめての人（講習を始めておらず、オープニングも見ていない）にだけ、オープニングを出す

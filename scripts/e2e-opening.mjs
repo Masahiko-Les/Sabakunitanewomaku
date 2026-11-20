@@ -11,9 +11,17 @@ let failed = false;
 const check = (c, m) => { console.log(c ? 'OK:' : 'NG:', m); if (!c) failed = true; };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-const ARRIVAL = ['おや……。', 'お空から落ちてきたんかい。\nここに来る人は、みんなそうさ。', 'ここは、生きづらさの砂漠。\nひとりで歩くには、ちょいと風が強すぎる所でね。'];
-const LAST = 'まずは火にあたって、あったまりな。\n種の蒔き方は、それから教えてあげようね。';
-const TUT_FIRST = 'おや、はじめて見る顔だねぇ。よく来たね。まあ、火にあたっていきな。';
+const ARRIVAL = ['おや……。', 'お空から落ちてきたんかい。\nここに来る人は、みんなそうさ。'];
+const LAST = 'まずは火にあたって、あったまりな。';
+const REST = [
+  'ここはね、「生きづらさ」っていう名前の砂漠なんだ。\nここに来た人は、みんなそれぞれ、自分だけの砂漠を歩いてる。',
+  'ひとりで歩くには、ちょいと風が強すぎる所でね。',
+  'でもね、ときどき、どこかの誰かが蒔いた種が、風に運ばれてあんたの砂漠にも届くんだよ。',
+  'その種にやさしい言葉で水をあげて、蒔いた人が「ありがとう」を返すと、花が咲く。\n花が咲くと、砂漠が少しずつ緑になっていくんだ。',
+  '種の蒔き方を教える前に、まずは水やりを覚えてほしいんだ。',
+  'じつはね、わたしも種を蒔いてあるんだよ。ほら、わたしのすぐそばの、左のところさ。',
+  '水やりのこつは「アドバイスより、共感」。\n「こうしたら？」より、「それはさみしいね」「その考え方、すてきだね」って、受けとめる言葉をかけてあげることさ。',
+  'うまく書こうとしなくていいからね。\nわたしの種を読んで、やさしい言葉で水をあげてみておくれ。'];
 const GIRL_END = 'この下にはね、何かを抱えた人たちが\nひとりずつ、種を蒔いている場所があるの。';
 const CASES = {
   '吃音': { girl: ['「吃音」……うん。', 'ずっと、ひとりで抱えてきたんだね。'], gran: '吃音のことを、抱えてきたんだねぇ。\n……よう、ここまで来た。' },
@@ -90,7 +98,7 @@ async function fullRun(choice, w, h, shots) {
   check(await page.evaluate(() => document.body.classList.contains('night')), `[${choice}] 着地のあと、地図は夜`);
   const bubs = await readGranny(page);
   if (shots) await page.screenshot({ path: `screenshots/op_${w}x${h}_4_granny.png` });
-  check(JSON.stringify(bubs.slice(0, 5)) === JSON.stringify([...ARRIVAL, CASES[choice].gran, LAST]) && bubs[5] === TUT_FIRST,
+  check(JSON.stringify(bubs) === JSON.stringify([...ARRIVAL, CASES[choice].gran, LAST, ...REST]),
     `[${choice}] おばあちゃん：到着のことば → 初回講習（${bubs.length} 吹き出し）`);
   check((await page.textContent('#bt')) === 'おばあちゃんの種を見にいく', `[${choice}] 最後は「おばあちゃんの種を見にいく」`);
   const uid = await uidOf(page);
@@ -115,8 +123,8 @@ async function skipRun(at) {
   check(await has(page, '#opening.landed'), `[スキップ：${at}] すぐ着地の閃光へ`);
   await page.waitForFunction(() => !document.querySelector('#opening'), null, { timeout: 4000 });
   const bubs = await readGranny(page);
-  const expect = choice ? [...ARRIVAL, `${choice}のことを、抱えてきたんだねぇ。\n……よう、ここまで来た。`, LAST, TUT_FIRST] : [...ARRIVAL, LAST, TUT_FIRST];
-  check(JSON.stringify(bubs.slice(0, expect.length)) === JSON.stringify(expect), `[スキップ：${at}] おばあちゃんの台詞 ${JSON.stringify(bubs.slice(0, expect.length))}`);
+  const expect = choice ? [...ARRIVAL, `${choice}のことを、抱えてきたんだねぇ。\n……よう、ここまで来た。`, LAST, ...REST] : [...ARRIVAL, LAST, ...REST];
+  check(JSON.stringify(bubs) === JSON.stringify(expect), `[スキップ：${at}] おばあちゃんの台詞（${bubs.length} 吹き出し）`);
   const f = (await getRaw(`users/${await uidOf(page)}`))?.fields || {};
   check(choice ? f.interest?.stringValue === choice : ('nullValue' in (f.interest || {})), `[スキップ：${at}] interest は ${choice ?? 'null'}`);
   await ctx.close();
@@ -127,6 +135,12 @@ async function skipRun(at) {
   const { ctx, page } = await fullRun('吃音', 390, 844, true);
   await page.click('#bt'); await sleep(3500);
   check((await page.textContent('#btnPlant')).includes('おばあちゃんの種に水やり'), '講習に進んだ（「おばあちゃんの種に水やり」）');
+  check(!(await page.evaluate(() => document.querySelector('#sheet').classList.contains('on'))), '会話のあと、自動ではおばあちゃんの種を開かない（自由に歩ける）');
+  await page.screenshot({ path: 'screenshots/op_5_free.png' });
+  // 自分でおばあちゃんの種（マス 47,50 → 初期カメラで画面の (45, 319)）をタップすると、歩いていって開く
+  await page.mouse.click(45, 319);
+  await page.locator('#tL').waitFor({ state: 'visible', timeout: 15000 });
+  check((await page.textContent('#sheetBody')).includes('おばあちゃんの種'), '自分でタップすると、おばあちゃんの種が開く');
   await page.reload({ waitUntil: 'load' }); await sleep(3000);
   check(!(await has(page, '#opening')) && !(await page.evaluate(() => document.querySelector('#sheet').classList.contains('on'))), '2 回目は、オープニングも説明シートも出ない');
   check((await page.textContent('#btnPlant')).includes('おばあちゃんの種に水やり'), '再読み込みしても講習の続き');
