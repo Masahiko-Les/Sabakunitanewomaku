@@ -367,6 +367,8 @@ function bloom(s){s.bloomAt=Date.now();const before=storm.reduce((a,v)=>a+(v>.5)
  setTimeout(()=>toast(after<before?'花のまわりに緑が広がり、嵐が少しやわらいだ':'花のまわりに、緑が広がった'),900)}
 
 /* ---------- plant ---------- */
+// 「やさしい言葉で、水をあげる」に添える、ジョウロの絵（注ぎ口から水が 3 滴）
+const CAN_ICON='<svg class="canicon" viewBox="0 0 30 22" aria-hidden="true"><path d="M8 7h12l-1.4 12.2a1.6 1.6 0 0 1-1.6 1.4h-6a1.6 1.6 0 0 1-1.6-1.4z" fill="#8fb3c4"/><rect x="7" y="5.6" width="14" height="2.6" rx="1.3" fill="#7aa2b5"/><path d="M10.5 6V4.2a3.5 3.5 0 0 1 7 0V6" fill="none" stroke="#7aa2b5" stroke-width="1.8"/><path d="M19.5 12.5l6-5" stroke="#7aa2b5" stroke-width="2.2" stroke-linecap="round"/><ellipse cx="26.2" cy="6.9" rx="1.9" ry="1.2" transform="rotate(-40 26.2 6.9)" fill="#7aa2b5"/><circle cx="27.4" cy="11" r="1" fill="#a9d3e6"/><circle cx="25.6" cy="13.4" r="1" fill="#a9d3e6"/><circle cx="28.3" cy="14.6" r="1" fill="#a9d3e6"/></svg>';
 // 「〇〇の種」の見出しに添える、マップと同じ土と種の絵
 const SEED_ICON='<svg class="seedicon" viewBox="-14 -4 28 14" aria-hidden="true"><ellipse cx="0" cy="4" rx="13" ry="5.5" fill="#d8b07c"/><ellipse cx="0" cy="3" rx="11" ry="4" fill="#e2bf8c"/><ellipse cx="0" cy="2" rx="3.2" ry="2.3" fill="#8a6440"/></svg>';
 // 種カード：本文だけ。② があるときは、区切りの下に
@@ -483,11 +485,11 @@ function openSeed(s){if(s.mine)return openMine(s);if(s.granny)return openGrannyS
  const mine=myLetter(s);
  let body=`<div class="kicker seedk">${SEED_ICON}誰かの種</div>${seedCard(s)}<p class="state">${stageText[stageOf(s)]}</p>`;
  if(!mine&&(S.tutorial||0)<3){body+=`<p class="note">水やりは、焚き火のそばのおばあちゃんに教わってからにしよう。</p><div class="row"><button class="btn soft small" id="x">閉じる</button></div>`}
- else if(!mine){body+=`<label>優しい言葉で、水をあげる（10行まで）</label><textarea id="tL" rows="5" maxlength="300" placeholder="アドバイスより、まずは受けとめる言葉を"></textarea><div class="count" id="cL"></div>
+ else if(!mine){body+=`<label class="wlabel">${CAN_ICON}優しい言葉で、水をあげる（10行まで）</label><textarea id="tL" rows="5" maxlength="300" placeholder="アドバイスより、まずは受けとめる言葉を"></textarea><div class="count" id="cL"></div>
   ${s.sample?'':'<p class="note">手紙は、この種を蒔いた人にだけ届きます。ほかの人には見えません。</p>'}
   <div class="row"><button class="btn ghost small" id="x">閉じる</button><button class="btn main small" id="ok" disabled>水をあげる</button></div>`}
  else{body+=`<div class="letter"><div class="from">あなたが届けた手紙</div><div class="txt">${esc(mine.text)}</div></div>
-  <p class="state">${mine.thanked?'ありがとうが返ってきて、花がひとつ咲きました。':'手紙は届いています。'}</p><div class="row"><button class="btn soft small" id="x">閉じる</button></div>`}
+  <p class="state">${mine.thanked?'ありがとうが返ってきて、花がひとつ咲きました。':'花が咲くのを待ちましょう'}</p><div class="row"><button class="btn soft small" id="x">閉じる</button></div>`}
  const canRep=FB&&!s.sample&&!s.granny;
  if(canRep)body=body.replace(/(<div class="row">[^]*<\/div>)$/,'<div class="row" style="justify-content:flex-start;margin-top:8px"><button class="btn ghost small" id="rep" style="padding-left:0">この種を知らせる</button></div>$1');
  markSeen(s);
@@ -593,7 +595,7 @@ const TUT={
   'じつはね、わたしも種を蒔いてあるんだよ。ほら、わたしのすぐそばの、左のところさ。',
   '水やりのこつは「アドバイスより、共感」。「こうしたら？」より、「それはさみしいね」「その考え方、すてきだね」って、受けとめる言葉をかけてあげることさ。',
   'うまく書こうとしなくていいからね。わたしの種を読んで、やさしい言葉で水をあげてみておくれ。'],
- practice:['ほら風に乗って、タネが飛んできたよ。優しい言葉で水やりしてみて'],
+ practice:['ほら砂風に乗って、種が飛んできたよ。優しい言葉で水やりしてみておくれ。'],
  remind:['わたしの種は、すぐそばの左のところだよ。','アドバイスより、共感。受けとめる言葉で、水をあげてみておくれ。'],
  reading:['（おばあちゃんが、あなたの言葉をゆっくり読んでいる……）','……ありがとうねぇ。あったかい言葉だった。','こんなふうに言ってもらえると、明日もまた薪をくべようって思えるよ。','じゃあ、わたしからも「ありがとう」を返そうね。'],
  finish:['ほら、咲いたねぇ。まわりの砂も、少し緑になっただろう？','あんたの言葉で、この砂漠がひとつ、生きやすくなったんだよ。','こんどは、あんたの番だ。緑の上に立って、あんたの生きづらさを種にして蒔いてごらん。','あんたの種も、どこかの誰かの砂漠に届いて、きっと誰かが水をあげてくれるからね。','書き方に迷ったら、いつでもわたしに聞きにおいで。']};
@@ -620,7 +622,7 @@ function grannyThanks(){talkSheet(({play,button})=>play(TUT.reading,()=>button('
 function openGrannySeed(s){const mine=myLetter(s),tu=S.tutorial||0;
  let body=`<div class="kicker seedk">${SEED_ICON}おばあちゃんの種</div>${seedCard(s)}`;
  if(!mine&&tu>=1){body+=`<div class="care" style="font-size:13.5px;line-height:1.95"><b style="font-weight:500">水やりのこつ</b><br>・まずは、気持ちを受けとめる<br>　（「それは、さみしいですね」）<br>・向き合い方の、よいところを伝える<br>　（「その考え方、すてきです」）<br>・アドバイスは、しなくて大丈夫</div>
-  <label>やさしい言葉で、水をあげる（10行まで）</label><textarea id="tL" rows="5" maxlength="300" placeholder="たとえば：できることを数えるって、すてきですね。"></textarea><div class="count" id="cL"></div>
+  <label class="wlabel">${CAN_ICON}やさしい言葉で、水をあげる（10行まで）</label><textarea id="tL" rows="5" maxlength="300" placeholder="たとえば：できることを数えるって、すてきですね。"></textarea><div class="count" id="cL"></div>
   <div class="row"><button class="btn ghost small" id="x">閉じる</button><button class="btn main small" id="ok" disabled>水をあげる</button></div>`}
  else if(!mine){body+=`<p class="note">先に、焚き火のそばのおばあちゃんに話しかけてみよう。</p><div class="row"><button class="btn soft small" id="x">閉じる</button></div>`}
  else{body+=`<div class="letter"><div class="from">あなたがおばあちゃんに届けた手紙</div><div class="txt">${esc(mine.text)}</div></div><p class="state">${mine.thanked?'おばあちゃんから、ありがとうが返ってきました。':'おばあちゃんが、手紙を読んでいます。'}</p><div class="row"><button class="btn soft small" id="x">閉じる</button></div>`}

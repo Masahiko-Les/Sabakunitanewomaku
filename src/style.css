@@ -101,3 +101,5 @@ textarea:focus{border-color:#e0b48e}
 .preview .parchment{margin-bottom:4px}
 .kicker.seedk{display:flex;align-items:center;gap:7px}
 .seedicon{width:26px;height:13px;flex:none}
+label.wlabel{display:flex;align-items:center;gap:6px}
+.canicon{width:24px;height:18px;flex:none}
