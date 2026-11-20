@@ -93,9 +93,9 @@ const SEEN={}; // 種ごとに、最後に見たできごとの時刻（users/{u
 const FLOWERS=[{p:'#f29bb0',c:'#f7d36b',n:5,g:'255,150,180'},{p:'#f7c948',c:'#c97b2b',n:8,g:'255,210,90'},{p:'#ffffff',c:'#f2c14e',n:6,g:'255,250,235'},{p:'#b79be8',c:'#f5e08a',n:5,g:'190,160,255'},{p:'#f59a7a',c:'#fff1c1',n:6,g:'255,170,130'}];
 // 開発用：「次の日にする」で進めた日数。日付で動く処理（練習の種のありがとう、1 日の受け取り数、種と芽の 7 日）はこの時計を使う
 // サーバーの時刻（ルールの request.time）は進まないので、ルール側の期限は本当の時刻のまま
-const DEV_DAYS_KEY='sabaku-dev-days',DEV_KEY='sabaku-dev';
-try{if(new URLSearchParams(location.search).get('dev')==='1')localStorage.setItem(DEV_KEY,'1')}catch(e){}
-const devTools=import.meta.env.DEV||(()=>{try{return localStorage.getItem(DEV_KEY)==='1'}catch(e){return false}})();
+const DEV_DAYS_KEY='sabaku-dev-days';
+// 「次の日にする」（設定）は、本番でも出す（友人に見せるとき、翌日の様子をイメージしてもらうため）
+const devTools=true;
 const devDays=(()=>{try{return devTools?Number(localStorage.getItem(DEV_DAYS_KEY))||0:0}catch(e){return 0}})();
 const clock=()=>Date.now()+devDays*86400000;
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
@@ -739,7 +739,7 @@ function openSettings(){
    // 自分の記録と自分の世界を消し、新しい匿名アカウントで最初から（ほかの人の世界にある種や手紙はそのまま）
    try{await resetAll()}catch(e){console.error('[resetAll]',e)}
    // 新しいアカウントで、オープニングからはじめる（オープニングを見た印と、選んだ関心テーマも消す）
-   try{localStorage.removeItem(KEY);localStorage.removeItem(OPEN_KEY);localStorage.removeItem(INTEREST_KEY)}catch(e){}
+   try{localStorage.removeItem(KEY);localStorage.removeItem(OPEN_KEY);localStorage.removeItem(INTEREST_KEY);localStorage.removeItem(DEV_DAYS_KEY)}catch(e){}
    location.reload()}})}
 function openCare(){openSheet(`<div class="kicker">困ったときの相談先</div>${contactsHTML()}<div class="row"><button class="btn main small" id="x">閉じる</button></div>`,e=>e.querySelector('#x').onclick=closeSheet)}
 $('#btnSet').onclick=()=>{if(ready&&!inputLocked())openSettings()};
