@@ -148,12 +148,9 @@ check((await sheetText(A)).includes('花が咲いています'), 'A：再読み�
 await A.page.click('[data-go]'); await A.page.waitForTimeout(1200);
 check((await sheetText(A)).includes('ありがとうを返しました'), 'A：ありがとうは取り消せない（「ありがとうを返しました」）');
 
-// ── A：自分に、手紙を書く（点はつかない）
-await A.page.click('#selfBtn'); await A.page.fill('#tS', 'よくがんばってるよ。'); await A.page.click('#sOk'); await A.page.waitForTimeout(1500);
-check((await getJSON(`seeds/${seedId}/letters/${A.uid}`))?.text === 'よくがんばってるよ。', 'A：自分への手紙が保存された');
-check((await sheetText(A)).includes('自分から自分への手紙') && !(await sheetText(A)).includes('自分に、手紙を書く'), 'A：自分への手紙が表示され、2 通目は書けない');
+// ── A：自分の種には、自分で手紙を書けない（「自分に、手紙を書く」は廃止）
+check(!(await A.page.$('#selfBtn')) && !(await sheetText(A)).includes('自分に、手紙を書く'), 'A：自分の種に「自分に、手紙を書く」はない');
 await closeSheet(A);
-check(!(await dotOn(A)), 'A：自分の手紙では点はつかない');
 
 await browser.close();
 console.log(failed ? 'FAILED' : 'ALL PASSED');

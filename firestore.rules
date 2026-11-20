@@ -157,11 +157,11 @@ service cloud.firestore {
         // 読めるのは、蒔いた人と、その手紙を書いた人だけ
         allow read: if signedIn() && (me() == writer || seed().ownerUid == me());
 
-        // 書けるのは、自分の世界にある種だけ（自分の種と、届いた公開中の種）
+        // 書けるのは、自分の世界に届いた公開中の種だけ（自分の種には書けない）
         allow create: if signedIn() && me() == writer
-          && (seed().ownerUid == me()
-              || (seed().status == 'public'
-                  && exists(/databases/$(db)/documents/worlds/$(me())/tiles/$(seedId))))
+          && seed().ownerUid != me()
+          && seed().status == 'public'
+          && exists(/databases/$(db)/documents/worlds/$(me())/tiles/$(seedId))
           && request.resource.data.keys().hasOnly(['writerUid','text','createdAt','thanked','thankedAt'])
           && request.resource.data.writerUid == me()
           // 種と芽は、蒔いてから 1 週間で消える。手紙を書けるのはそれまで

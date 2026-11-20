@@ -483,24 +483,18 @@ function openSeed(s){if(s.mine)return openMine(s);if(s.granny)return openGrannyS
    else if(FB){writeLetter(s.id,l.text);watchReceived(s)}closeSheet();toast('水をあげました')}})}
 
 function openMine(s){
- const self=s.letters.find(l=>l.from==='me');
  const letters=s.letters.map(l=>`<div class="letter"><div class="from">${l.from==='me'?'自分から自分への手紙':'誰かからの手紙'}</div><div class="txt">${esc(l.text)}</div>
   <div class="act">${FB&&l.from!=='me'?`<button class="btn ghost small" data-rep="${l.id}" style="margin-right:auto;padding-left:0">この手紙を知らせる</button>`:''}${l.thanked?'ありがとうを返しました':expired(s)?'':`<button class="btn main small" data-thx="${l.id}">ありがとう</button>`}</div></div>`).join('');
  const body=`<div class="kicker">あなたの種</div>${seedCard(s)}
  <p class="state">${s.hidden?'この種は、ほかの人には見えない場所に置いてあります':stageText[stageOf(s)]}</p>
  ${s.letters.length?`<div class="sec">届いた手紙</div>${letters}`:`<p class="empty">まだ手紙は届いていません。誰かが通りかかるのを、静かに待っています。</p>`}
- ${self||expired(s)?'':`<div id="selfWrap"><div class="row" style="justify-content:flex-start"><button class="btn ghost small" id="selfBtn" style="padding-left:0">自分に、手紙を書く</button></div></div>`}
  <div class="row"><button class="btn soft small" id="x">閉じる</button></div>`;
  markSeen(s);
  openSheet(body,el=>{el.querySelector('#x').onclick=closeSheet;
   el.querySelectorAll('[data-rep]').forEach(b=>b.onclick=()=>{if(!b.dataset.c){b.dataset.c=1;b.textContent='本当に知らせる';return}
    const w=b.dataset.rep;MUTED[s.id+'_'+w]=true;reportLetter(s.id,w);s.letters=s.letters.filter(z=>z.id!==w);save();rebuildWorld();refreshDot();openMine(s);toast('知らせました。この手紙は、もう表示されません')});
   el.querySelectorAll('[data-thx]').forEach(b=>b.onclick=()=>{const l=s.letters.find(z=>z.id===b.dataset.thx);if(!l)return;l.thanked=true;l.thankedAt=Date.now();save();thankLetter(s.id,l.id);
-   b.parentElement.textContent='ありがとうを返しました';if(!s.hidden){bloom(s);setTimeout(closeSheet,500)}});
-  const sb=el.querySelector('#selfBtn');if(sb)sb.onclick=()=>{const w=el.querySelector('#selfWrap');
-   w.innerHTML=`<label>自分に、優しい言葉をかける（10行まで）</label><textarea id="tS" rows="5" maxlength="300" placeholder="友だちにかけるような言葉で"></textarea><div class="count" id="cS"></div><div class="row"><button class="btn main small" id="sOk" disabled>水をあげる</button></div>`;
-   const ta=w.querySelector('#tS'),ok=w.querySelector('#sOk');lineLimit(ta,10,w.querySelector('#cS'));ta.addEventListener('input',()=>ok.disabled=!ta.value.trim());ta.focus();
-   ok.onclick=()=>{const text=ta.value.trim();s.letters.push({id:getUid()||uid(),from:'me',text,t:Date.now(),thanked:false});save();writeLetter(s.id,text);openMine(s)}}})}
+   b.parentElement.textContent='ありがとうを返しました';if(!s.hidden){bloom(s);setTimeout(closeSheet,500)}});})}
 
 /* ---------- my seeds list ---------- */
 function goTo(s){const cx=(s.x+.5)*TILE,cy=(s.y+.5)*TILE;P.x=cx-TILE;P.y=cy-10;if(solid(P.x,P.y+10))P.x=cx+TILE;
