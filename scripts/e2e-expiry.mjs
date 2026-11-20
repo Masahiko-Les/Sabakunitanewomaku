@@ -36,9 +36,9 @@ const mineList = async () => { await page.click('#btnMine'); await page.waitForT
 await page.goto(URL, { waitUntil: 'load' });
 await page.locator('#sheet.on').waitFor({ timeout: 15000 });
 const me = await uidOf();
-await fetch(`${FS}/users/${me}?updateMask.fieldPaths=tutorial&updateMask.fieldPaths=introSeen&updateMask.fieldPaths=metGranny&updateMask.fieldPaths=dummies`, {
+await fetch(`${FS}/users/${me}?updateMask.fieldPaths=tutorial&updateMask.fieldPaths=introSeen&updateMask.fieldPaths=metGranny&updateMask.fieldPaths=dummies&updateMask.fieldPaths=sampleLetters`, {
   method: 'PATCH', headers: OWNER,
-  body: JSON.stringify({ fields: { tutorial: { integerValue: 3 }, introSeen: { booleanValue: true }, metGranny: { booleanValue: true }, dummies: { mapValue: { fields: { s0: { mapValue: { fields: { x: { integerValue: 0 }, y: { integerValue: 0 } } } } } } } } }) });
+  body: JSON.stringify({ fields: { tutorial: { integerValue: 3 }, introSeen: { booleanValue: true }, metGranny: { booleanValue: true }, dummies: { mapValue: { fields: { s0: { mapValue: { fields: { x: { integerValue: 0 }, y: { integerValue: 0 } } } } } } }, sampleLetters: { mapValue: { fields: { s0: { mapValue: { fields: { text: { stringValue: '練習の手紙' }, t: { integerValue: 1 }, thanked: { booleanValue: true } } } } } } } } }) });
 
 const T = Date.now().toString(36), other = 'other' + T;
 // 自分の種：①6日目の種 ②8日目の種（手紙なし）③8日目の芽（ありがとうなし）④8日目の花

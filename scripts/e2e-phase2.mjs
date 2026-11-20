@@ -110,15 +110,21 @@ check((await page.textContent('#btnPlant')).includes('おばあちゃんの話�
 await page.screenshot({ path: `${OUT}/p2_3_tutorial2_reload.png` });
 await page.waitForTimeout(1500);
 d = await userDoc(uid);
-const dm = Object.keys(d.dummies?.mapValue?.fields || {});
-check(dm.length === 3 && dm.every(k => /^s[0-7]$/.test(k)), `おばあちゃんの種が咲いていれば、3 つの種が蒔かれる ${dm}`);
-const dummiesJson = JSON.stringify(d.dummies);
+check(!d.dummies, '講習の締めの会話の前は、練習の種はまだない（おばあちゃんの種だけ）');
 await tapGranny();
 await waitText('はじめる');
 await page.getByText('はじめる', { exact: true }).click();
 await page.waitForTimeout(800);
 d = await userDoc(uid);
 check(d.tutorial === 3, `tutorial=3（講習完了）`);
+// 締めの会話のあと：風に乗って、全員共通の練習の種 3 つが飛んでくる →「ほら風に乗って…」
+await waitText('ほら風に乗って、タネが飛んできたよ。優しい言葉で水やりしてみて');
+await page.screenshot({ path: `${OUT}/p2_3b_practice.png` });
+d = await userDoc(uid);
+const dm = Object.keys(d.dummies?.mapValue?.fields || {}).sort();
+check(JSON.stringify(dm) === JSON.stringify(['s0', 's1', 's7']), `練習の種は全員共通の 3 つ ${dm}`);
+const dummiesJson = JSON.stringify(d.dummies);
+await page.getByText('閉じる', { exact: true }).click(); await page.waitForTimeout(500);
 
 // 7. 再読み込み → 講習完了のまま
 await page.reload({ waitUntil: 'load' });

@@ -33,9 +33,9 @@ await fetch('http://127.0.0.1:8080/emulator/v1/projects/demo-sabaku/databases/(d
 await page.goto(URL, { waitUntil: 'load' });
 await page.locator('#sheet.on').waitFor({ timeout: 15000 });
 const uid = await uidOf();
-await fetch(`${FS}/users/${uid}?updateMask.fieldPaths=tutorial&updateMask.fieldPaths=introSeen&updateMask.fieldPaths=metGranny&updateMask.fieldPaths=dummies`, {
+await fetch(`${FS}/users/${uid}?updateMask.fieldPaths=tutorial&updateMask.fieldPaths=introSeen&updateMask.fieldPaths=metGranny&updateMask.fieldPaths=dummies&updateMask.fieldPaths=sampleLetters`, {
   method: 'PATCH', headers: OWNER,
-  body: JSON.stringify({ fields: { tutorial: { integerValue: 3 }, introSeen: { booleanValue: true }, metGranny: { booleanValue: true }, dummies: { mapValue: { fields: { s0: { mapValue: { fields: { x: { integerValue: 0 }, y: { integerValue: 0 } } } } } } } } }) });
+  body: JSON.stringify({ fields: { tutorial: { integerValue: 3 }, introSeen: { booleanValue: true }, metGranny: { booleanValue: true }, dummies: { mapValue: { fields: { s0: { mapValue: { fields: { x: { integerValue: 0 }, y: { integerValue: 0 } } } } } } }, sampleLetters: { mapValue: { fields: { s0: { mapValue: { fields: { text: { stringValue: '練習の手紙' }, t: { integerValue: 1 }, thanked: { booleanValue: true } } } } } } } } }) });
 await page.reload({ waitUntil: 'load' }); await boot();
 
 // ── 右上は ⚙ だけ
@@ -97,7 +97,7 @@ check(!!(await getRaw(`users/${uid}`)), 'まだ消えていない');
 await page.evaluate(() => sessionStorage.setItem('sabaku-test-opening', '1')); // このあとはオープニングを出してよい
 await Promise.all([page.waitForNavigation({ waitUntil: 'load' }), page.click('#rst')]);
 await page.locator('#opening').waitFor({ timeout: 15000 });
-const uid2 = await uidOf();
+let uid2 = null; for (let i = 0; i < 30 && !uid2; i++) { uid2 = await uidOf(); if (!uid2 || uid2 === uid) { uid2 = null; await page.waitForTimeout(300); } } // 新しい匿名ログインを待つ
 check(uid2 && uid2 !== uid, `新しい匿名アカウントで始まった（${uid} → ${uid2}）`);
 check(!!(await page.$('#opening')), '消したあとは、オープニングから始まる');
 await page.screenshot({ path: 'screenshots/set_4_after_reset.png' });

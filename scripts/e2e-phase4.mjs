@@ -73,6 +73,12 @@ const Q = await plantA('ひとつめの種');
 await Promise.all(pages.map(p => p.goto(URL, { waitUntil: 'load' })));
 await Promise.all(pages.map(p => p.waitForFunction(() => document.querySelector('#btnPlant').textContent.length > 0)));
 const uids = await Promise.all(pages.map(uidOf));
+// 講習を終え、練習の種（世界の隅）に水やり済みの扱いにする（本物の種が届くのは、それから）
+await Promise.all(uids.map(u => fetch(`${FS}/users/${u}?updateMask.fieldPaths=tutorial&updateMask.fieldPaths=metGranny&updateMask.fieldPaths=introSeen&updateMask.fieldPaths=dummies&updateMask.fieldPaths=sampleLetters`, {
+  method: 'PATCH', headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' },
+  body: JSON.stringify({ fields: { tutorial: { integerValue: 3 }, metGranny: { booleanValue: true }, introSeen: { booleanValue: true }, dummies: { mapValue: { fields: { s0: { mapValue: { fields: { x: { integerValue: 0 }, y: { integerValue: 0 } } } } } } }, sampleLetters: { mapValue: { fields: { s0: { mapValue: { fields: { text: { stringValue: '練習の手紙' }, t: { integerValue: 1 }, thanked: { booleanValue: true } } } } } } } } }) })));
+await Promise.all(pages.map(p => p.reload({ waitUntil: 'load' })));
+await Promise.all(pages.map(p => p.waitForFunction(() => document.querySelector('#btnPlant').textContent.length > 0)));
 await settle(uids);
 let q = await getJSON(`seeds/${Q}`);
 check(q.deliveredCount === 5 && q.deliveredTo.length === 5 && new Set(q.deliveredTo).size === 5 && q.open === false,

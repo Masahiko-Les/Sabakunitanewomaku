@@ -418,12 +418,26 @@ function startGust(s){const sx=(s.x+.5)*TILE,sy=(s.y+.5)*TILE;
   fl:Array.from({length:GUST_N},(_,i)=>({d:1.0+i*.32+Math.random()*.12,on:false,x:sx,y:sy,vx:0,vy:0,rot:Math.random()*6,wob:Math.random()*6.28,sz:.85+Math.random()*.3})),
   st:Array.from({length:240},()=>({x:Math.random()*vw*1.5-vw*.5,y:Math.random()*(vh+200)-150,v:900+Math.random()*700,len:30+Math.random()*90,w:.8+Math.random()*2.2,dk:Math.random()<.6})),
   cl:Array.from({length:12},()=>({x:Math.random()*vw*1.6-vw*.6,y:Math.random()*(vh+300)-200,r:140+Math.random()*220,v:500+Math.random()*400,a:.25+Math.random()*.3}))}}
+// 講習のあとの風：綿毛が画面の左から飛んできて、練習の種のマスに降りる（降りたら onLand、すべて降りて風がおさまったら onDone）
+function startGustIn(targets,onLand,onDone){
+ gust={mode:'in',t0:performance.now(),sx:0,sy:0,I:0,said:true,flash:0,done:onDone,
+  fl:targets.map((g,i)=>({d:1.0+i*.45,on:false,landed:false,tx:(g.x+.5)*TILE,ty:(g.y+.5)*TILE,x0:0,y0:0,x:0,y:0,rot:Math.random()*6,wob:Math.random()*6.28,sz:.85+Math.random()*.3,flash:0,land:()=>onLand(g)})),
+  st:Array.from({length:240},()=>({x:Math.random()*vw*1.5-vw*.5,y:Math.random()*(vh+200)-150,v:900+Math.random()*700,len:30+Math.random()*90,w:.8+Math.random()*2.2,dk:Math.random()<.6})),
+  cl:Array.from({length:12},()=>({x:Math.random()*vw*1.6-vw*.6,y:Math.random()*(vh+300)-200,r:140+Math.random()*220,v:500+Math.random()*400,a:.25+Math.random()*.3}))}}
 function updateGust(dt,now){if(!gust)return;const e=(now-gust.t0)/1000,I=gustLevel(e);gust.I=I;gust.e=e;
  if(!gust.said&&e>.5){gust.said=true;toast(PLANT_TALK.gustStart)}
  for(const p of gust.st){p.x+=p.v*I*dt;p.y+=p.v*.28*I*dt;if(p.x>vw+120||p.y>vh+120){p.x=-120-Math.random()*vw*.5;p.y=Math.random()*(vh+200)-200}}
  for(const c of gust.cl){c.x+=c.v*I*dt;c.y+=c.v*.28*I*dt;if(c.x-c.r>vw||c.y-c.r>vh){c.x=-c.r-Math.random()*vw*.4;c.y=Math.random()*(vh+200)-c.r}}
  cam.x+=(Math.random()-.5)*4*I;cam.y+=(Math.random()-.5)*3*I;
  gust.flash=Math.max(0,gust.flash-dt*2.5);
+ if(gust.mode==='in'){let left=0;
+  for(const f of gust.fl){f.flash=Math.max(0,f.flash-dt*2);if(f.landed)continue;left++;
+   if(!f.on){if(e>f.d){f.on=true;f.x0=cam.x-60;f.y0=f.ty-120-Math.random()*160}else continue}
+   const p=clamp((e-f.d)/1.8,0,1),q=1-Math.pow(1-p,2);
+   f.x=f.x0+(f.tx-f.x0)*q;f.y=f.y0+(f.ty-f.y0)*q+Math.sin(p*Math.PI*2+f.wob)*18*(1-p);f.rot+=dt*3;
+   if(p>=1){f.landed=true;f.flash=1;f.land()}}
+  if(e>5.3&&!left){const d=gust.done;gust=null;if(d)d()}
+  return}
  let alive=0;
  for(const f of gust.fl){
   if(!f.on){if(e>f.d){f.on=true;f.vx=10;f.vy=-70;gust.flash=1}else{alive++;continue}}
@@ -458,7 +472,9 @@ function drawGust(t){if(!gust)return;const I=gust.I;
  if(gust.flash>0){const g=ctx.createRadialGradient(gust.sx,gust.sy,0,gust.sx,gust.sy,40);g.addColorStop(0,`rgba(255,240,190,${.7*gust.flash})`);g.addColorStop(1,'rgba(255,240,190,0)');
   ctx.globalCompositeOperation='lighter';ctx.fillStyle=g;ctx.beginPath();ctx.arc(gust.sx,gust.sy,40,0,Math.PI*2);ctx.fill();ctx.globalCompositeOperation='source-over'}
  // 綿毛
- for(const f of gust.fl){if(!f.on)continue;drawFluff(f.x,f.y-6,f.sz,f.rot,t)}
+ for(const f of gust.fl){if(!f.flash)continue;const g=ctx.createRadialGradient(f.tx,f.ty,0,f.tx,f.ty,40);g.addColorStop(0,`rgba(255,240,190,${.7*f.flash})`);g.addColorStop(1,'rgba(255,240,190,0)');
+  ctx.globalCompositeOperation='lighter';ctx.fillStyle=g;ctx.beginPath();ctx.arc(f.tx,f.ty,40,0,Math.PI*2);ctx.fill();ctx.globalCompositeOperation='source-over'}
+ for(const f of gust.fl){if(!f.on||f.landed)continue;drawFluff(f.x,f.y-6,f.sz,f.rot,t)}
  ctx.restore()}
 
 /* ---------- open seed ---------- */
@@ -481,7 +497,7 @@ function openSeed(s){if(s.mine)return openMine(s);if(s.granny)return openGrannyS
   const ta=el.querySelector('#tL');if(!ta)return;
   const ok=el.querySelector('#ok');lineLimit(ta,10,el.querySelector('#cL'));ta.addEventListener('input',()=>ok.disabled=!ta.value.trim());
   ok.onclick=()=>{const l={id:getUid()||uid(),from:'me',text:ta.value.trim(),t:Date.now(),thanked:false};s.letters.push(l);save();
-   if(s.sample)saveUser({['sampleLetters.'+s.id]:{text:l.text,t:l.t,thanked:false}});
+   if(s.sample){saveUser({['sampleLetters.'+s.id]:{text:l.text,t:l.t,thanked:false}});setTimeout(receiveSeeds,1500)}
    else if(FB){writeLetter(s.id,l.text);watchReceived(s)}closeSheet();toast('水をあげました')}})}
 
 function openMine(s){
@@ -577,6 +593,7 @@ const TUT={
   'じつはね、わたしも種を蒔いてあるんだよ。ほら、わたしのすぐそばの、左のところさ。',
   '水やりのこつは「アドバイスより、共感」。「こうしたら？」より、「それはさみしいね」「その考え方、すてきだね」って、受けとめる言葉をかけてあげることさ。',
   'うまく書こうとしなくていいからね。わたしの種を読んで、やさしい言葉で水をあげてみておくれ。'],
+ practice:['ほら風に乗って、タネが飛んできたよ。優しい言葉で水やりしてみて'],
  remind:['わたしの種は、すぐそばの左のところだよ。','アドバイスより、共感。受けとめる言葉で、水をあげてみておくれ。'],
  reading:['（おばあちゃんが、あなたの言葉をゆっくり読んでいる……）','……ありがとうねぇ。あったかい言葉だった。','こんなふうに言ってもらえると、明日もまた薪をくべようって思えるよ。','じゃあ、わたしからも「ありがとう」を返そうね。'],
  finish:['ほら、咲いたねぇ。まわりの砂も、少し緑になっただろう？','あんたの言葉で、この砂漠がひとつ、生きやすくなったんだよ。','こんどは、あんたの番だ。緑の上に立って、あんたの生きづらさを種にして蒔いてごらん。','あんたの種も、どこかの誰かの砂漠に届いて、きっと誰かが水をあげてくれるからね。','書き方に迷ったら、いつでもわたしに聞きにおいで。']};
@@ -594,11 +611,11 @@ function grannySeed(){return S.seeds.find(s=>s.granny)}
 function walkToGrannySeed(){const g=grannySeed();if(!g)return;target={x:(g.x+.5)*TILE+TILE,y:(g.y+.5)*TILE-10};pendingOpen=g.id}
 // 初回講習のはじまり：「おばあちゃんの種を見にいく」。自動では歩かず、プレイヤーが自分でおばあちゃんの種を探してタップする
 function goGrannySeed(){S.tutorial=1;S.metGranny=true;save();saveUser({tutorial:1,metGranny:true});closeSheet()}
-function finishTutorial(){S.tutorial=3;S.metGranny=true;save();saveUser({tutorial:3,metGranny:true});closeSheet();setTimeout(()=>toast('緑の上に立って、種を蒔いてみよう'),400)}
+// 講習の締めの会話のあと：風が吹いて、練習の種 3 つが飛んでくる →「ほら風に乗って…」
+function finishTutorial(){S.tutorial=3;S.metGranny=true;save();saveUser({tutorial:3,metGranny:true});closeSheet();setTimeout(()=>plantDummies(true),900)}
 function grannyThanks(){talkSheet(({play,button})=>play(TUT.reading,()=>button('花を見る',()=>{
  const g=grannySeed(),l=g&&myLetter(g);if(l&&!l.thanked){l.thanked=true;l.thankedAt=Date.now();save()}
  closeSheet();if(g)bloom(g);
- setTimeout(plantDummies,1600);
  setTimeout(()=>talkSheet(({play,button})=>play(TUT.finish,()=>button('はじめる',finishTutorial))),3200)})))}
 function openGrannySeed(s){const mine=myLetter(s),tu=S.tutorial||0;
  let body=`<div class="kicker seedk">${SEED_ICON}おばあちゃんの種</div>${seedCard(s)}`;
@@ -692,14 +709,20 @@ function sampleThanks(){const t=dayKey(Date.now());let ch=false;
  if(ch){save();refreshDot()}}
 
 /* ---------- delivery: まだ 5 つの世界に届いていない種を、自分の世界に受け取る ---------- */
-// おばあちゃんの種が咲いたら、見本の文章から 3 つ選んで、空いている緑のマスにランダムに蒔く（自分で蒔く場所は残す）
-const DUMMY_COUNT=3;
-function plantDummies(){if(USE_SAMPLES||Object.keys(DUMMIES).length)return;
- const free=freeGreenTiles(),n=Math.min(DUMMY_COUNT,free.length-KEEP_FREE);if(n<=0)return;
- const ids=SAMPLES.map((_,i)=>i).sort(()=>Math.random()-.5).slice(0,n);
- for(const i of ids){const [x,y]=free.splice(Math.floor(Math.random()*free.length),1)[0];DUMMIES['s'+i]={x,y}}
+// 練習の種：講習が終わると、風に乗って全員共通の 3 つ（見本から軽めのもの）が、プレイヤーの近くの空いている緑に飛んでくる
+// （自分で蒔く場所は残す）。本物の種が届き始めるのは、このどれかに水やりしてから
+const PRACTICE=[1,7,0]; // SAMPLES の番号：朝、布団から出られない／人混みで息が苦しい／言葉が詰まる
+function plantDummies(animate){if(USE_SAMPLES||Object.keys(DUMMIES).length)return;
+ const free=freeGreenTiles().sort((a,b)=>Math.hypot((a[0]+.5)*TILE-P.x,(a[1]+.5)*TILE-P.y)-Math.hypot((b[0]+.5)*TILE-P.x,(b[1]+.5)*TILE-P.y));
+ const n=Math.min(PRACTICE.length,free.length-KEEP_FREE);if(n<=0)return;
+ const near=free.slice(0,Math.max(n,8));
+ const picks=PRACTICE.slice(0,n).map(i=>{const [x,y]=near.splice(Math.floor(Math.random()*near.length),1)[0];DUMMIES['s'+i]={x,y};return{id:'s'+i,x,y}});
  saveUser({dummies:{...DUMMIES}});
- const have=new Set(S.seeds.map(s=>s.id));S.seeds.push(...sampleSeeds().filter(s=>!have.has(s.id)));save();rebuildWorld()}
+ const add=id=>{if(S.seeds.some(s=>s.id===id))return;S.seeds.push(...sampleSeeds().filter(s=>s.id===id));save();rebuildWorld()};
+ if(!animate){picks.forEach(p=>add(p.id));return}
+ startGustIn(picks,p=>add(p.id),()=>talkSheet(({play,button})=>play(TUT.practice,()=>button('閉じる',closeSheet))))}
+// 本物の種を受け取ってよいか：練習の種のどれかに水やりした（または、もう本物の種が届いている）
+const practiceDone=()=>S.seeds.some(s=>s.sample&&myLetter(s))||S.seeds.some(s=>!s.mine&&!s.sample&&!s.granny);
 function freeGreenTiles(){const out=[];
  for(let y=0;y<N;y++)for(let x=0;x<N;x++){if(green[y*N+x]<.5||inVillage(x,y)||decor[y*N+x]||onDrawing(x,y)||seedOn(x,y))continue;out.push([x,y])}
  return out}
@@ -710,7 +733,7 @@ async function receiveWithRetry(id,x,y,t){
    await new Promise(r=>setTimeout(r,150+Math.random()*350*(i+1)))}}
  return null}
 let delivering=false;
-async function receiveSeeds(){if(!FB||delivering||!ready)return;delivering=true;
+async function receiveSeeds(){if(!FB||delivering||!ready||!practiceDone())return;delivering=true;
  try{const t=dayKey(Date.now());let n=U.receivedDate===t?U.receivedToday:0;if(n>=DAILY_RECEIVE)return;
   // ほかの人に先を越されることもあるので、候補は多めに取り、足りなければ探しなおす
   for(let round=0;round<3&&n<DAILY_RECEIVE;round++){
@@ -763,7 +786,7 @@ function runOpening(){let chose=false;
    if((S.tutorial||0)===0)talkSheet(({play,button})=>play(grandmaLines(c),()=>button('おばあちゃんの種を見にいく',goGrannySeed)));
    else talkSheet(({play,button})=>play(arrivalLines(c),()=>button('はじめる',closeSheet)))}})}
 
-initUser().then(async u=>{if(u)applyWorld(await loadMyWorld());applyUser(u);startWatchers();if(u&&(S.tutorial||0)>=2)plantDummies()}).catch(e=>console.error('[initUser]',e)).finally(()=>{ready=true;sampleThanks();refreshDot();
+initUser().then(async u=>{if(u)applyWorld(await loadMyWorld());applyUser(u);startWatchers();if(u&&(S.tutorial||0)>=3)plantDummies(false)}).catch(e=>console.error('[initUser]',e)).finally(()=>{ready=true;sampleThanks();refreshDot();
  // はじめての人（講習を始めておらず、オープニングも見ていない）にだけ、オープニングを出す
  if(openingEl&&(forceOpening||(!S.metGranny&&(S.tutorial||0)===0&&!U.openingSeen))){runOpening();receiveSeeds();setInterval(receiveSeeds,DELIVERY_INTERVAL);setInterval(()=>{sampleThanks();prune()},60*1000);return}
  if(openingEl){openingEl.remove();openingEl=null}

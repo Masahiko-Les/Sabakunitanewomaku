@@ -36,9 +36,9 @@ async function player(name) {
     req.onsuccess = () => { const a = req.result.transaction('firebaseLocalStorage').objectStore('firebaseLocalStorage').getAll();
       a.onsuccess = () => res(a.result.find(r => r.value?.uid)?.value.uid || null); };
   }));
-  await fetch(`${FS}/users/${uid}?updateMask.fieldPaths=tutorial&updateMask.fieldPaths=introSeen&updateMask.fieldPaths=metGranny&updateMask.fieldPaths=dummies`, {
+  await fetch(`${FS}/users/${uid}?updateMask.fieldPaths=tutorial&updateMask.fieldPaths=introSeen&updateMask.fieldPaths=metGranny&updateMask.fieldPaths=dummies&updateMask.fieldPaths=sampleLetters`, {
     method: 'PATCH', headers: OWNER,
-    body: JSON.stringify({ fields: { tutorial: { integerValue: 3 }, introSeen: { booleanValue: true }, metGranny: { booleanValue: true }, dummies: { mapValue: { fields: { s0: { mapValue: { fields: { x: { integerValue: 0 }, y: { integerValue: 0 } } } } } } } } }) });
+    body: JSON.stringify({ fields: { tutorial: { integerValue: 3 }, introSeen: { booleanValue: true }, metGranny: { booleanValue: true }, dummies: { mapValue: { fields: { s0: { mapValue: { fields: { x: { integerValue: 0 }, y: { integerValue: 0 } } } } } } }, sampleLetters: { mapValue: { fields: { s0: { mapValue: { fields: { text: { stringValue: '練習の手紙' }, t: { integerValue: 1 }, thanked: { booleanValue: true } } } } } } } } }) });
   const p = { page, uid, name, P: null };
   await reload(p);
   return p;
@@ -101,7 +101,7 @@ const seedId = (await list(`worlds/${A.uid}/tiles`))[0].seedId;
 
 // ── B の世界に届く → B が手紙を書く
 const B = await player('B');
-const bt = (await list(`worlds/${B.uid}/tiles`)).find(t => t.seedId === seedId);
+let bt; for (let i = 0; i < 30 && !bt; i++) { bt = (await list(`worlds/${B.uid}/tiles`)).find(t => t.seedId === seedId); if (!bt) await new Promise(r => setTimeout(r, 500)); } // 配達は講習後の再読み込みから
 check(!!bt, `B の世界に A の種が届いた（${bt?.x},${bt?.y}）`);
 await openSeedAt(B, bt.x, bt.y);
 check((await sheetText(B)).includes(H1) && (await sheetText(B)).includes('誰かの種'), 'B が A の種を開いた');
