@@ -99,3 +99,5 @@ textarea:focus{border-color:#e0b48e}
 .talkin{margin-top:12px}
 .preview{animation:fadein .35s;margin-top:4px}
 .preview .parchment{margin-bottom:4px}
+.kicker.seedk{display:flex;align-items:center;gap:7px}
+.seedicon{width:26px;height:13px;flex:none}

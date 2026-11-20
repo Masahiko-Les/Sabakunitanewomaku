@@ -367,6 +367,8 @@ function bloom(s){s.bloomAt=Date.now();const before=storm.reduce((a,v)=>a+(v>.5)
  setTimeout(()=>toast(after<before?'花のまわりに緑が広がり、嵐が少しやわらいだ':'花のまわりに、緑が広がった'),900)}
 
 /* ---------- plant ---------- */
+// 「〇〇の種」の見出しに添える、マップと同じ土と種の絵
+const SEED_ICON='<svg class="seedicon" viewBox="-14 -4 28 14" aria-hidden="true"><ellipse cx="0" cy="4" rx="13" ry="5.5" fill="#d8b07c"/><ellipse cx="0" cy="3" rx="11" ry="4" fill="#e2bf8c"/><ellipse cx="0" cy="2" rx="3.2" ry="2.3" fill="#8a6440"/></svg>';
 // 種カード：本文だけ。② があるときは、区切りの下に
 function seedCard(s){return `<div class="parchment"><p class="hard">${esc(s.h)}</p>${s.f?`<div class="psep"></div><p class="face">${esc(s.f)}</p>`:''}</div>`}
 $('#btnPlant').onclick=()=>{if(!ready)return;const pi=plantState();if(!pi.ok)return;plantTalk(pi,{h:'',f:''})};
@@ -463,7 +465,7 @@ function drawGust(t){if(!gust)return;const I=gust.I;
 const stageText={seed:'まだ、水を待っています',sprout:'芽が出ています',flower:'花が咲いています'};
 function openSeed(s){if(s.mine)return openMine(s);if(s.granny)return openGrannySeed(s);
  const mine=myLetter(s);
- let body=`<div class="kicker">誰かの種</div>${seedCard(s)}<p class="state">${stageText[stageOf(s)]}</p>`;
+ let body=`<div class="kicker seedk">${SEED_ICON}誰かの種</div>${seedCard(s)}<p class="state">${stageText[stageOf(s)]}</p>`;
  if(!mine&&(S.tutorial||0)<3){body+=`<p class="note">水やりは、焚き火のそばのおばあちゃんに教わってからにしよう。</p><div class="row"><button class="btn soft small" id="x">閉じる</button></div>`}
  else if(!mine){body+=`<label>優しい言葉で、水をあげる（10行まで）</label><textarea id="tL" rows="5" maxlength="300" placeholder="アドバイスより、まずは受けとめる言葉を"></textarea><div class="count" id="cL"></div>
   ${s.sample?'':'<p class="note">手紙は、この種を蒔いた人にだけ届きます。ほかの人には見えません。</p>'}
@@ -485,7 +487,7 @@ function openSeed(s){if(s.mine)return openMine(s);if(s.granny)return openGrannyS
 function openMine(s){
  const letters=s.letters.map(l=>`<div class="letter"><div class="from">${l.from==='me'?'自分から自分への手紙':'誰かからの手紙'}</div><div class="txt">${esc(l.text)}</div>
   <div class="act">${FB&&l.from!=='me'?`<button class="btn ghost small" data-rep="${l.id}" style="margin-right:auto;padding-left:0">この手紙を知らせる</button>`:''}${l.thanked?'ありがとうを返しました':expired(s)?'':`<button class="btn main small" data-thx="${l.id}">ありがとう</button>`}</div></div>`).join('');
- const body=`<div class="kicker">あなたの種</div>${seedCard(s)}
+ const body=`<div class="kicker seedk">${SEED_ICON}あなたの種</div>${seedCard(s)}
  <p class="state">${s.hidden?'この種は、ほかの人には見えない場所に置いてあります':stageText[stageOf(s)]}</p>
  ${s.letters.length?`<div class="sec">届いた手紙</div>${letters}`:`<p class="empty">まだ水やりされていません。誰かが通りかかるのを、静かに待っています。</p>`}
  <div class="row" style="justify-content:flex-start;margin-top:8px"><button class="btn ghost small" id="pull" style="padding-left:0">種を抜く</button></div>
@@ -512,7 +514,7 @@ function goTo(s){const cx=(s.x+.5)*TILE,cy=(s.y+.5)*TILE;P.x=cx-TILE;P.y=cy-10;i
 $('#btnMine').onclick=()=>{if(!ready)return;
  const mine=S.seeds.filter(s=>s.mine&&shown(s)).sort((a,b)=>b.t-a.t),wat=S.seeds.filter(s=>!s.mine&&myLetter(s)&&shown(s));
  const item=s=>`<button class="list-item" data-go="${s.id}">${s.unread?'<span class="dot" style="margin:0 6px 0 0"></span>':''}${esc(s.h.split('\n')[0])}<div class="s">${s.hidden?'見えない場所に置いてあります':stageText[stageOf(s)]}${s.mine&&s.letters.length?` ・ 手紙 ${s.letters.length}通`:''}${!s.mine&&myLetter(s).thanked?' ・ ありがとうが返ってきました':''}</div></button>`;
- openSheet(`<div class="kicker">わたしの種</div>
+ openSheet(`<div class="kicker seedk">${SEED_ICON}わたしの種</div>
  ${mine.length?mine.map(item).join(''):'<p class="empty">まだ種を蒔いていません。<br>村のまわりの緑で、気になったマスを選んで「ここに種を蒔く」を押してみてください。</p>'}
  <div class="sec">水をあげた種</div>${wat.length?wat.map(item).join(''):'<p class="empty">砂漠を歩いて、誰かの種を探してみてください。</p>'}
  <div class="row"><button class="btn soft small" id="x">閉じる</button></div>`,el=>{el.querySelector('#x').onclick=closeSheet;
@@ -599,7 +601,7 @@ function grannyThanks(){talkSheet(({play,button})=>play(TUT.reading,()=>button('
  setTimeout(plantDummies,1600);
  setTimeout(()=>talkSheet(({play,button})=>play(TUT.finish,()=>button('はじめる',finishTutorial))),3200)})))}
 function openGrannySeed(s){const mine=myLetter(s),tu=S.tutorial||0;
- let body=`<div class="kicker">おばあちゃんの種</div>${seedCard(s)}`;
+ let body=`<div class="kicker seedk">${SEED_ICON}おばあちゃんの種</div>${seedCard(s)}`;
  if(!mine&&tu>=1){body+=`<div class="care" style="font-size:13.5px;line-height:1.95"><b style="font-weight:500">水やりのこつ</b><br>・まずは、気持ちを受けとめる<br>　（「それは、さみしいですね」）<br>・向き合い方の、よいところを伝える<br>　（「その考え方、すてきです」）<br>・アドバイスは、しなくて大丈夫</div>
   <label>やさしい言葉で、水をあげる（10行まで）</label><textarea id="tL" rows="5" maxlength="300" placeholder="たとえば：できることを数えるって、すてきですね。"></textarea><div class="count" id="cL"></div>
   <div class="row"><button class="btn ghost small" id="x">閉じる</button><button class="btn main small" id="ok" disabled>水をあげる</button></div>`}
@@ -631,7 +633,6 @@ function openHelp(){openSheet(`<div class="help"><div class="kicker">この世�
 /* ---------- settings ---------- */
 // 利用規約などのページ（public/ に置いた下書き）
 const LINKS=[['利用規約','/terms.html'],['プライバシーポリシー','/privacy.html'],['お問い合わせ','/contact.html']];
-const RESET_KEY='sabaku-reset';
 function openSettings(){
  const seg=[['auto','時刻に合わせる'],['day','昼'],['night','夜']].map(([k,t])=>`<button data-sky="${k}"${k===skyMode()?' class="on"':''}>${t}</button>`).join('');
  openSheet(`<div class="settings"><div class="kicker">設定</div><h2>設定</h2>
@@ -652,7 +653,8 @@ function openSettings(){
    if(r.dataset.busy)return;r.dataset.busy=1;
    // 自分の記録と自分の世界を消し、新しい匿名アカウントで最初から（ほかの人の世界にある種や手紙はそのまま）
    try{await resetAll()}catch(e){console.error('[resetAll]',e)}
-   try{localStorage.removeItem(KEY);sessionStorage.setItem(RESET_KEY,'1')}catch(e){}
+   // 新しいアカウントで、オープニングからはじめる（オープニングを見た印と、選んだ関心テーマも消す）
+   try{localStorage.removeItem(KEY);localStorage.removeItem(OPEN_KEY);localStorage.removeItem(INTEREST_KEY)}catch(e){}
    location.reload()}})}
 function openCare(){openSheet(`<div class="kicker">困ったときの相談先</div>${contactsHTML()}<div class="row"><button class="btn main small" id="x">閉じる</button></div>`,e=>e.querySelector('#x').onclick=closeSheet)}
 $('#btnSet').onclick=()=>{if(ready)openSettings()};
@@ -766,9 +768,6 @@ initUser().then(async u=>{if(u)applyWorld(await loadMyWorld());applyUser(u);star
  if(openingEl&&(forceOpening||(!S.metGranny&&(S.tutorial||0)===0&&!U.openingSeen))){runOpening();receiveSeeds();setInterval(receiveSeeds,DELIVERY_INTERVAL);setInterval(()=>{sampleThanks();prune()},60*1000);return}
  if(openingEl){openingEl.remove();openingEl=null}
  try{localStorage.setItem(OPEN_KEY,'1')}catch(e){}
- // 「すべてのデータを消す」のあと：試作版と同じく、説明は出さずに「世界をはじめの姿に戻しました」
- let wasReset=false;try{wasReset=!!sessionStorage.getItem(RESET_KEY);sessionStorage.removeItem(RESET_KEY)}catch(e){}
- if(wasReset){S.introSeen=true;save();saveUser({introSeen:true});setTimeout(()=>toast('世界をはじめの姿に戻しました'),400)}
- else if(!S.introSeen)setTimeout(openHelp,400);
+ if(!S.introSeen)setTimeout(openHelp,400);
  receiveSeeds();setInterval(receiveSeeds,DELIVERY_INTERVAL);setInterval(()=>{sampleThanks();prune()},60*1000)});
 })();
