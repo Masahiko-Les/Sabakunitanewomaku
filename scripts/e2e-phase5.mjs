@@ -3,6 +3,7 @@
 // 前提：npm run emulators と、.env.local で VITE_USE_EMULATOR=true にした npm run dev が動いていること
 import { chromium } from '@playwright/test';
 import { newContext } from './skip-opening.mjs';
+import { sowSeed } from './plant-talk.mjs';
 
 const URL = 'http://localhost:5173';
 const BASE = 'http://127.0.0.1:8080';
@@ -95,8 +96,7 @@ async function waitFor(fn, ms = 10000) { const end = Date.now() + ms; while (Dat
 const A = await player('A');
 await A.page.mouse.click(285, 309); await A.page.waitForTimeout(3500);
 const H1 = '人と話すとき、言葉が詰まってしまう。';
-await A.page.click('#btnPlant'); await A.page.fill('#tH', H1); await A.page.fill('#tF', '最初のひと言を「あの」で始めている。');
-await A.page.click('#ok'); await A.page.waitForTimeout(1500);
+await sowSeed(A.page, H1, '最初のひと言を「あの」で始めている。');
 const seedId = (await list(`worlds/${A.uid}/tiles`))[0].seedId;
 
 // ── B の世界に届く → B が手紙を書く

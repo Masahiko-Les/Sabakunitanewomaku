@@ -23,6 +23,11 @@ await expect(false, 'ownerUid を他人にして蒔く', () => { const r = doc(c
   b.set(r, seedData(A.uid)); b.set(doc(B.db, 'worlds', B.uid, 'tiles', r.id), tileData(r.id)); return b.commit(); });
 await expect(false, '他人の世界にタイルを置く', () => plantBatch(B, {}, {}, A.uid).commit());
 await expect(false, '他人の種を自分の own タイルにする', () => setDoc(doc(B.db, 'worlds', B.uid, 'tiles', pub.ref.id), tileData(pub.ref.id)));
+await expect(true, '② を書かずに蒔く（f は null）', () => plantBatch(A, { f: null }).commit());
+await expect(true, '② を書かずに蒔く（f なし）', () => { const { f, ...rest } = seedData(A.uid); const r = doc(collection(A.db, 'seeds')), b = writeBatch(A.db);
+  b.set(r, rest); b.set(doc(A.db, 'worlds', A.uid, 'tiles', r.id), tileData(r.id)); return b.commit(); });
+await expect(false, 'f が空文字', () => plantBatch(A, { f: '' }).commit());
+await expect(false, 'f が文字列以外', () => plantBatch(A, { f: 3 }).commit());
 await expect(false, 'h が 61 字', () => plantBatch(A, { h: 'あ'.repeat(61) }).commit());
 await expect(false, 'f が 241 字', () => plantBatch(A, { f: 'あ'.repeat(241) }).commit());
 await expect(false, 'h が空', () => plantBatch(A, { h: '' }).commit());

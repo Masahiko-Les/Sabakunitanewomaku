@@ -4,6 +4,7 @@
 // 終わったら表示される uid と seedId の後片付けを行うこと（Firestore の users/worlds/seeds と、Authentication のユーザー）。
 import { chromium } from '@playwright/test';
 import { newContext } from './skip-opening.mjs';
+import { sowSeed } from './plant-talk.mjs';
 import { mkdir } from 'fs/promises';
 
 const URL = process.argv[2] || 'https://sabakunitanewomaku.vercel.app';
@@ -70,9 +71,7 @@ check(!/おばあちゃん/.test(await btn()), `講習を終えたまま再開�
 
 // 4. 種を蒔く（hidden になる言葉で）→ 相談先シート
 await page.mouse.click(237, 453); await page.waitForTimeout(3500);
-await page.click('#btnPlant');
-await page.fill('#tH', '確認用の種です。消えたい日がある。'); await page.fill('#tF', '公開版の動作確認のための種です。');
-await page.click('#ok'); await page.waitForTimeout(2500);
+await sowSeed(page, '確認用の種です。消えたい日がある。', '公開版の動作確認のための種です。', { crisis: true }); await page.waitForTimeout(1000);
 await page.screenshot({ path: 'screenshots/prod_2_crisis.png' });
 check((await page.textContent('#sheetBody')).includes('0120-783-556'), '蒔いたあとに相談先のシートが出た');
 const seedId = await page.evaluate(() => JSON.parse(localStorage.getItem('sabaku-ni-tane-v3')).seeds.find(s => s.mine)?.id);

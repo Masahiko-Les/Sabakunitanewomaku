@@ -2,6 +2,7 @@ import './style.css';
 import { enabled as FB, initUser, saveUser, loadMyWorld, plantSeed, findDeliverable, receiveSeed,
   getUid, watchLetters, watchMyLetter, writeLetter, thankLetter, resetAll, reportSeed, reportLetter } from './firebase.js';
 import { startOpening, grandmaLines, arrivalLines } from './opening/opening.js';
+import { PLANT_TALK, PLANT_BUTTONS, PLANT_PLACEHOLDERS } from './talk/plant.js';
 
 // 見本の種 8 つを置くか。公開版では置かない（最初は種も花もない）。VITE_USE_SAMPLES=true で試作版と同じく置く
 const USE_SAMPLES = import.meta.env.VITE_USE_SAMPLES === 'true';
@@ -230,7 +231,9 @@ function drawSeed(s,t){const x=s.x*TILE+TILE/2,y=s.y*TILE+TILE/2,st=stageOf(s);
  if((s.mine&&s.unread)||(s.granny&&(S.tutorial||0)===1)){const a=.25+.15*Math.sin(t/400);const g=ctx.createRadialGradient(x,y,2,x,y,26);g.addColorStop(0,`rgba(255,240,200,${a})`);g.addColorStop(1,'rgba(255,240,200,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,26,0,Math.PI*2);ctx.fill()}
  if(st!=='flower'){ell(x,y+4,13,5.5,'#d8b07c');ell(x,y+3,11,4,'#e2bf8c')}
  if(s.mine){ctx.setLineDash([2,4]);ctx.strokeStyle='rgba(255,255,255,.75)';ctx.lineWidth=1.2;ctx.beginPath();ctx.ellipse(x,y+4,17,7.5,0,0,Math.PI*2);ctx.stroke();ctx.setLineDash([])}
- if(st==='seed'){const g=s.plantedAt?clamp((t-s.plantedAt)/600,0,1):1;ell(x,y+2-(1-g)*6,3.2,2.3,'#8a6440')}
+ if(st==='seed'){if(s.plantedAt&&t<s.plantedAt)return;const g=s.plantedAt?clamp((t-s.plantedAt)/250,0,1):1;ell(x,y+2-(1-g)*2,3.2,2.3,'#8a6440');
+  // ② まで書かれた種には、小さな葉を 1 枚だけ（控えめに）
+  if(s.f){ctx.fillStyle='rgba(134,184,116,.9)';ctx.beginPath();ctx.ellipse(x+4.2,y-.6,2.6,1.2,-.6,0,Math.PI*2);ctx.fill()}}
  else if(st==='sprout'){const sw=Math.sin(t/800+x)*1.2;ctx.strokeStyle='#6f9a5e';ctx.lineWidth=1.8;ctx.beginPath();ctx.moveTo(x,y+3);ctx.lineTo(x+sw,y-6);ctx.stroke();
   ctx.fillStyle='#86b874';ctx.beginPath();ctx.ellipse(x+sw-4,y-7,4.5,2.2,.5,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.ellipse(x+sw+4,y-8,4.5,2.2,-.5,0,Math.PI*2);ctx.fill()}
  else{const n=Math.min(OFFS.length,thanksOf(s));for(let i=0;i<n;i++)drawFlower(x+OFFS[i][0],y+OFFS[i][1],s.flower+i*2,bloomScale(s,i,n),t)}}
@@ -331,7 +334,7 @@ function draw(t){ctx.setTransform(dpr,0,0,dpr,0,0);ctx.globalCompositeOperation=
  if(!sheetOpen&&Math.hypot(P.x-GRAN.x,P.y-GRAN.y)<230){const bx=GRAN.x+2,by=GRAN.y-40+Math.sin(t/500)*1.5;
   ctx.fillStyle='rgba(255,252,245,.95)';ctx.beginPath();ctx.roundRect(bx-15,by-10,30,18,9);ctx.fill();ctx.beginPath();ctx.moveTo(bx-3,by+7);ctx.lineTo(bx,by+12);ctx.lineTo(bx+3,by+7);ctx.fill();
   for(let i=-1;i<=1;i++)ell(bx+i*7,by-1,1.7,1.7,`rgba(138,117,96,${.45+.55*((Math.floor(t/350)%3)===i+1)})`)}
- ctx.restore()}
+ ctx.restore();drawWind(t)}
 function drawGranny(t){const x=GRAN.x,y=GRAN.y,br=Math.sin(t/900)*.6;
  ell(x,y+11,14,4.5,'rgba(60,50,40,.22)');
  ctx.fillStyle='#8a5e3e';ctx.beginPath();ctx.roundRect(x-11,y+2,22,8,3);ctx.fill();ell(x+11,y+6,2.5,4,'#a87a55');
@@ -360,32 +363,65 @@ function bloom(s){s.bloomAt=Date.now();const before=storm.reduce((a,v)=>a+(v>.5)
  setTimeout(()=>toast(after<before?'花のまわりに緑が広がり、嵐が少しやわらいだ':'花のまわりに、緑が広がった'),900)}
 
 /* ---------- plant ---------- */
-$('#btnPlant').onclick=()=>{if(!ready)return;const pi=plantState();if(!pi.ok)return;
- openSheet(`<div class="kicker">種を蒔く</div><h2>このマスに、ひとつ種を蒔きます</h2>
- <label>① 抱えている生きづらさ（2行まで）</label><textarea id="tH" rows="2" maxlength="60" placeholder="たとえば：人前で話すとき、言葉が出てこない"></textarea><div class="count" id="cH"></div>
- <label>② それに、どう向き合っているか（8行まで）</label><textarea id="tF" rows="6" maxlength="240" placeholder="うまくいかなくても、試していること・支えになっていること"></textarea><div class="count" id="cF"></div>
- <p class="note">名前はどこにも表示されません。通りがかった人は、この本文だけを読めます。</p>
- <div class="row"><button class="btn ghost small" id="x">やめる</button><button class="btn main small" id="ok" disabled>蒔く</button></div>`,el=>{
-  const h=el.querySelector('#tH'),f=el.querySelector('#tF'),ok=el.querySelector('#ok');
-  lineLimit(h,2,el.querySelector('#cH'));lineLimit(f,8,el.querySelector('#cF'));
-  const chk=()=>ok.disabled=!(h.value.trim()&&f.value.trim());h.addEventListener('input',chk);f.addEventListener('input',chk);
-  el.querySelector('#x').onclick=closeSheet;
-  ok.onclick=()=>{if(seedOn(pi.tx,pi.ty)){closeSheet();return}
-   const crisis=CRISIS.test(h.value+f.value);
-   const sd={x:pi.tx,y:pi.ty,h:h.value.trim(),f:f.value.trim(),flower:Math.floor(Math.random()*5),hidden:crisis};
-   const pr=plantSeed(sd),ns={id:pr.id||uid(),...sd,mine:true,t:Date.now(),letters:[],plantedAt:performance.now()};S.seeds.push(ns);save();
-   if(pr.id)pr.done.then(()=>watchOwn(ns));
-   const sx=(pi.tx+.5)*TILE;for(const dx of[-TILE*.75,TILE*.75]){if(!solid(sx+dx,P.y+10)){P.x=sx+dx;break}}
-   if(crisis){openSheet(`<div class="kicker">種を預かりました</div>${careHTML()}<p class="note">この種は、ほかの人には見えない場所にそっと置いておきます。（公開版では、管理者が確認してから扱いを決める想定です）</p><div class="row"><button class="btn main small" id="x">閉じる</button></div>`,e=>e.querySelector('#x').onclick=closeSheet)}
-   else{closeSheet();toast('種を蒔きました')}}})};
+// 種カード：本文だけ。② があるときは、区切りの下に
+function seedCard(s){return `<div class="parchment"><p class="hard">${esc(s.h)}</p>${s.f?`<div class="psep"></div><p class="face">${esc(s.f)}</p>`:''}</div>`}
+$('#btnPlant').onclick=()=>{if(!ready)return;const pi=plantState();if(!pi.ok)return;plantTalk(pi,{h:'',f:''})};
+// 種を蒔く：おばあちゃんとの会話。入力欄は 1 つずつ出す（① → ② → 確認）
+function plantTalk(pi,draft){talkSheet(({say,you,ctl,scroll})=>{
+ const talk=document.getElementById('talk');
+ const ask=(key,rows,max,lines,buttons)=>{
+  ctl.innerHTML=`<textarea id="tIn" class="talkin" rows="${rows}" maxlength="${max}" placeholder="${PLANT_PLACEHOLDERS[key]}"></textarea><div class="count" id="cIn"></div>
+   <div class="row">${buttons.map(([id,label,cls])=>`<button class="btn ${cls} small" id="${id}">${label}</button>`).join('')}</div>`;
+  const ta=ctl.querySelector('#tIn');ta.value=draft[key]||'';lineLimit(ta,lines,ctl.querySelector('#cIn'));
+  const go=ctl.querySelector('#pTalk');const chk=()=>go.disabled=!ta.value.trim();ta.addEventListener('input',chk);chk();scroll();return ta};
+ const step1=()=>{say(PLANT_TALK.ask);
+  const ta=ask('h',2,60,2,[['pTalk',PLANT_BUTTONS.talk,'main']]);
+  ctl.querySelector('#pTalk').onclick=()=>{draft.h=ta.value.trim();you(draft.h);ctl.innerHTML='';setTimeout(step2,400)}};
+ const step2=()=>{say(PLANT_TALK.how);
+  const ta=ask('f',6,240,8,[['pSkip',PLANT_BUTTONS.skip,'ghost'],['pTalk',PLANT_BUTTONS.talk,'main']]);
+  ctl.querySelector('#pTalk').onclick=()=>{draft.f=ta.value.trim();you(draft.f);ctl.innerHTML='';setTimeout(step3,400)};
+  ctl.querySelector('#pSkip').onclick=()=>{draft.f='';you(PLANT_BUTTONS.skip);ctl.innerHTML='';setTimeout(()=>{say(PLANT_TALK.skipped);setTimeout(step3,700)},400)}};
+ const step3=()=>{say(PLANT_TALK.ready);
+  const card=document.createElement('div');card.className='preview';card.innerHTML=seedCard({h:draft.h,f:draft.f||null});talk.appendChild(card);
+  ctl.innerHTML=`<p class="note">名前はどこにも表示されません。通りがかった人は、この本文だけを読めます。</p>
+   <div class="row"><button class="btn ghost small" id="pEdit">${PLANT_BUTTONS.edit}</button><button class="btn main small" id="pPlant">${PLANT_BUTTONS.plant}</button></div>`;scroll();
+  ctl.querySelector('#pEdit').onclick=()=>plantTalk(pi,draft);
+  ctl.querySelector('#pPlant').onclick=()=>sow(pi,draft)};
+ step1()})}
+function sow(pi,draft){if(seedOn(pi.tx,pi.ty)){closeSheet();return}
+ const h=draft.h,f=draft.f||null,crisis=CRISIS.test(h+(f||''));
+ const sd={x:pi.tx,y:pi.ty,h,f,flower:Math.floor(Math.random()*5),hidden:crisis};
+ const fx=performance.now();
+ const pr=plantSeed(sd),ns={id:pr.id||uid(),...sd,mine:true,t:Date.now(),letters:[],plantedAt:fx+WIND.fall};S.seeds.push(ns);save();
+ if(pr.id)pr.done.then(()=>watchOwn(ns));
+ const sx=(pi.tx+.5)*TILE,from={x:P.x,y:P.y-14};for(const dx of[-TILE*.75,TILE*.75]){if(!solid(sx+dx,P.y+10)){P.x=sx+dx;break}}
+ if(crisis){openSheet(`<div class="kicker">種を預かりました</div>${careHTML()}<p class="note">この種は、ほかの人には見えない場所にそっと置いておきます。（公開版では、管理者が確認してから扱いを決める想定です）</p><div class="row"><button class="btn main small" id="x">閉じる</button></div>`,e=>e.querySelector('#x').onclick=closeSheet);return}
+ // 種が地面に落ち、風が吹いて、種が画面の外へ運ばれていく → おばあちゃんのひと言 → 砂漠に戻る
+ closeSheet();windFx={t0:fx,from,x:sx,y:(pi.ty+.5)*TILE+2,seeds:Array.from({length:5},(_,i)=>({dy:-30-i*16+Math.random()*10,ph:Math.random()*6,d:i*120}))};
+ setTimeout(()=>{windFx=null;talkSheet(({play,button})=>play([PLANT_TALK.sent],()=>button(PLANT_BUTTONS.close,closeSheet)))},WIND.total)}
+const WIND={fall:700,blowAt:1000,total:4200};
+let windFx=null;
+function drawWind(t){const w=windFx;if(!w)return;const e=t-w.t0;ctx.save();ctx.translate(-cam.x,-cam.y);
+ // 1. 手もとから、マスへ落ちる
+ if(e<WIND.fall){const k=clamp(e/WIND.fall,0,1),ease=k*k;const x=w.from.x+(w.x-w.from.x)*k,y=w.from.y+(w.y-w.from.y)*ease-Math.sin(k*Math.PI)*10;ell(x,y,3.2,2.3,'#8a6440')}
+ // 2. 風が吹いて、小さな種が画面の外へ運ばれていく
+ const b=e-WIND.blowAt;
+ if(b>0){const span=WIND.total-WIND.blowAt,a=clamp(Math.min(b/400,(span-b)/500),0,1);
+  ctx.lineCap='round';ctx.lineWidth=1.4;
+  for(let i=0;i<9;i++){const yy=w.y-120+i*34+Math.sin(i*2.3)*12,xx=cam.x-160+((b*.55+i*137)%(vw+320)),len=60+(i%3)*24;
+   ctx.strokeStyle=`rgba(255,250,235,${.45*a})`;ctx.beginPath();ctx.moveTo(xx,yy);ctx.quadraticCurveTo(xx+len*.5,yy-6,xx+len,yy);ctx.stroke()}
+  for(const s of w.seeds){const k=clamp((b-s.d)/(span-500),0,1);if(k<=0||k>=1)continue;
+   const x=w.x+Math.pow(k,1.8)*(vw*.9+160),y=w.y+s.dy*Math.min(1,k*3)-k*90+Math.sin(k*9+s.ph)*8;
+   glow(x,y,11,'255,240,200',.45*(1-k*.5)*(.5+night*.5));ell(x,y,2.9,2.1,'#8a6440')}}
+ ctx.restore()}
 
 /* ---------- open seed ---------- */
 const stageText={seed:'まだ、水を待っています',sprout:'芽が出ています',flower:'花が咲いています'};
 function openSeed(s){if(s.mine)return openMine(s);if(s.granny)return openGrannySeed(s);
  const mine=myLetter(s);
- let body=`<div class="kicker">誰かの種</div><div class="parchment"><p class="slabel">生きづらさ：</p><p class="hard">${esc(s.h)}</p><p class="slabel">それにどう向き合っているか：</p><p class="face">${esc(s.f)}</p></div><p class="state">${stageText[stageOf(s)]}</p>`;
+ let body=`<div class="kicker">誰かの種</div>${seedCard(s)}<p class="state">${stageText[stageOf(s)]}</p>`;
  if(!mine&&(S.tutorial||0)<3){body+=`<p class="note">水やりは、焚き火のそばのおばあちゃんに教わってからにしよう。</p><div class="row"><button class="btn soft small" id="x">閉じる</button></div>`}
- else if(!mine){body+=`<label>優しい言葉の手紙で、水をあげる（10行まで）</label><textarea id="tL" rows="5" maxlength="300" placeholder="アドバイスより、まずは受けとめる言葉を"></textarea><div class="count" id="cL"></div>
+ else if(!mine){body+=`<label>優しい言葉で、水をあげる（10行まで）</label><textarea id="tL" rows="5" maxlength="300" placeholder="アドバイスより、まずは受けとめる言葉を"></textarea><div class="count" id="cL"></div>
   ${s.sample?'':'<p class="note">手紙は、この種を蒔いた人にだけ届きます。ほかの人には見えません。</p>'}
   <div class="row"><button class="btn ghost small" id="x">閉じる</button><button class="btn main small" id="ok" disabled>水をあげる</button></div>`}
  else{body+=`<div class="letter"><div class="from">あなたが届けた手紙</div><div class="txt">${esc(mine.text)}</div></div>
@@ -406,7 +442,7 @@ function openMine(s){
  const self=s.letters.find(l=>l.from==='me');
  const letters=s.letters.map(l=>`<div class="letter"><div class="from">${l.from==='me'?'自分から自分への手紙':'誰かからの手紙'}</div><div class="txt">${esc(l.text)}</div>
   <div class="act">${FB&&l.from!=='me'?`<button class="btn ghost small" data-rep="${l.id}" style="margin-right:auto;padding-left:0">この手紙を知らせる</button>`:''}${l.thanked?'ありがとうを返しました':expired(s)?'':`<button class="btn main small" data-thx="${l.id}">ありがとう</button>`}</div></div>`).join('');
- const body=`<div class="kicker">あなたの種</div><div class="parchment"><p class="slabel">生きづらさ：</p><p class="hard">${esc(s.h)}</p><p class="slabel">それにどう向き合っているか：</p><p class="face">${esc(s.f)}</p></div>
+ const body=`<div class="kicker">あなたの種</div>${seedCard(s)}
  <p class="state">${s.hidden?'この種は、ほかの人には見えない場所に置いてあります':stageText[stageOf(s)]}</p>
  ${s.letters.length?`<div class="sec">届いた手紙</div>${letters}`:`<p class="empty">まだ手紙は届いていません。誰かが通りかかるのを、静かに待っています。</p>`}
  ${self||expired(s)?'':`<div id="selfWrap"><div class="row" style="justify-content:flex-start"><button class="btn ghost small" id="selfBtn" style="padding-left:0">自分に、手紙を書く</button></div></div>`}
@@ -515,9 +551,9 @@ function grannyThanks(){talkSheet(({play,button})=>play(TUT.reading,()=>button('
  setTimeout(plantDummies,1600);
  setTimeout(()=>talkSheet(({play,button})=>play(TUT.finish,()=>button('はじめる',finishTutorial))),3200)})))}
 function openGrannySeed(s){const mine=myLetter(s),tu=S.tutorial||0;
- let body=`<div class="kicker">おばあちゃんの種</div><div class="parchment"><p class="slabel">生きづらさ：</p><p class="hard">${esc(s.h)}</p><p class="slabel">それにどう向き合っているか：</p><p class="face">${esc(s.f)}</p></div>`;
+ let body=`<div class="kicker">おばあちゃんの種</div>${seedCard(s)}`;
  if(!mine&&tu>=1){body+=`<div class="care" style="font-size:13.5px;line-height:1.95"><b style="font-weight:500">水やりのこつ</b><br>・まずは、気持ちを受けとめる<br>　（「それは、さみしいですね」）<br>・向き合い方の、よいところを伝える<br>　（「その考え方、すてきです」）<br>・アドバイスは、しなくて大丈夫</div>
-  <label>やさしい言葉の手紙で、水をあげる（10行まで）</label><textarea id="tL" rows="5" maxlength="300" placeholder="たとえば：できることを数えるって、すてきですね。"></textarea><div class="count" id="cL"></div>
+  <label>やさしい言葉で、水をあげる（10行まで）</label><textarea id="tL" rows="5" maxlength="300" placeholder="たとえば：できることを数えるって、すてきですね。"></textarea><div class="count" id="cL"></div>
   <div class="row"><button class="btn ghost small" id="x">閉じる</button><button class="btn main small" id="ok" disabled>水をあげる</button></div>`}
  else if(!mine){body+=`<p class="note">先に、焚き火のそばのおばあちゃんに話しかけてみよう。</p><div class="row"><button class="btn soft small" id="x">閉じる</button></div>`}
  else{body+=`<div class="letter"><div class="from">あなたがおばあちゃんに届けた手紙</div><div class="txt">${esc(mine.text)}</div></div><p class="state">${mine.thanked?'おばあちゃんから、ありがとうが返ってきました。':'おばあちゃんが、手紙を読んでいます。'}</p><div class="row"><button class="btn soft small" id="x">閉じる</button></div>`}

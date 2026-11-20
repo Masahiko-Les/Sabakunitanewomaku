@@ -2,6 +2,7 @@
 // 前提：npm run emulators と、.env.local で VITE_USE_EMULATOR=true にした npm run dev が動いていること
 import { chromium } from '@playwright/test';
 import { newContext } from './skip-opening.mjs';
+import { sowSeed } from './plant-talk.mjs';
 import { mkdir } from 'fs/promises';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -56,11 +57,8 @@ await page.mouse.click(285, 309);
 await page.waitForTimeout(3500);
 check((await label()).includes('ここに種を蒔く'), `蒔けるマスに立った（${await label()}）`);
 
-async function plant(h, f) {
-  await page.click('#btnPlant');
-  await page.fill('#tH', h); await page.fill('#tF', f);
-  await page.click('#ok');
-  await page.waitForTimeout(1500);
+async function plant(h, f, o) {
+  await sowSeed(page, h, f, o);
 }
 const H1 = '人と話すとき、言葉が詰まってしまう。', F1 = '最初のひと言を「あの」で始めると、少し楽になると気づいた。';
 await plant(H1, F1);
@@ -90,7 +88,7 @@ check((await page.textContent('#sheetBody')).includes(H1) && (await page.textCon
 await page.reload({ waitUntil: 'load' }); await boot();
 await page.mouse.click(285, 213); await page.waitForTimeout(3500); // 初期位置から (52,48)
 check((await label()).includes('ここに種を蒔く'), `となりの蒔けるマスに立った（${await label()}）`);
-await plant('もう消えたいと思う日がある。', '夜は早く寝るようにしている。');
+await plant('もう消えたいと思う日がある。', '夜は早く寝るようにしている。', { crisis: true });
 check((await page.textContent('#sheetBody')).includes('種を預かりました'), '相談先シートが出た');
 await page.screenshot({ path: `${OUT}/p3_3_crisis.png` });
 tiles = await listDocs(`worlds/${uid}/tiles`);

@@ -2,6 +2,7 @@
 // 前提：npm run emulators と、.env.local で VITE_USE_EMULATOR=true にした npm run dev が動いていること
 import { chromium } from '@playwright/test';
 import { newContext } from './skip-opening.mjs';
+import { sowSeed } from './plant-talk.mjs';
 
 const URL = 'http://localhost:5173';
 const FS = 'http://127.0.0.1:8080/v1/projects/demo-sabaku/databases/(default)/documents';
@@ -82,8 +83,7 @@ await lp.close();
 
 // ── すべてのデータを消す
 await page.mouse.click(285, 309); await page.waitForTimeout(3500);
-await page.click('#btnPlant'); await page.fill('#tH', '消す前の種です。'); await page.fill('#tF', 'あとで消える世界に蒔いた。');
-await page.click('#ok'); await page.waitForTimeout(2000);
+await sowSeed(page, '消す前の種です。', 'あとで消える世界に蒔いた。'); await page.waitForTimeout(500);
 // ほかのテストの種が届いていることもあるので、自分の種（kind: own）だけを数える
 const tiles = [];
 for (const id of await list(`worlds/${uid}/tiles`)) if ((await getRaw(`worlds/${uid}/tiles/${id}`))?.fields?.kind?.stringValue === 'own') tiles.push(id);

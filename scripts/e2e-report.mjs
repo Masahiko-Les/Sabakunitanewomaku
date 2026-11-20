@@ -2,6 +2,7 @@
 // 前提：npm run emulators と、.env.local で VITE_USE_EMULATOR=true にした npm run dev が動いていること
 import { chromium } from '@playwright/test';
 import { newContext } from './skip-opening.mjs';
+import { sowSeed } from './plant-talk.mjs';
 
 const URL = 'http://localhost:5173';
 const FS = 'http://127.0.0.1:8080/v1/projects/demo-sabaku/databases/(default)/documents';
@@ -41,8 +42,7 @@ await page.reload({ waitUntil: 'load' }); await boot();
 
 // 自分の種を蒔いて、そのマスの位置を知る
 await page.mouse.click(285, 309); await page.waitForTimeout(3500);
-await page.click('#btnPlant'); await page.fill('#tH', 'わたしの種です。'); await page.fill('#tF', '向き合っています。');
-await page.click('#ok'); await page.waitForTimeout(2500);
+await sowSeed(page, 'わたしの種です。', '向き合っています。'); await page.waitForTimeout(1000);
 const mineId = (await (await fetch(`${FS}/worlds/${me}/tiles`, { headers: OWNER })).json()).documents[0].name.split('/').pop();
 const mt = (await getRaw(`worlds/${me}/tiles/${mineId}`)).fields, X = +mt.x.integerValue, Y = +mt.y.integerValue;
 

@@ -118,7 +118,9 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['ownerUid','h','f','flower','createdAt','status','open','deliveredCount','deliveredTo'])
         && request.resource.data.ownerUid == me()
         && request.resource.data.h is string && request.resource.data.h.size() > 0 && request.resource.data.h.size() <= 60
-        && request.resource.data.f is string && request.resource.data.f.size() > 0 && request.resource.data.f.size() <= 240
+        // ②（向き合い方）は書かなくてもよい（null）
+        && (request.resource.data.get('f', null) == null
+            || (request.resource.data.f is string && request.resource.data.f.size() > 0 && request.resource.data.f.size() <= 240))
         && request.resource.data.flower is int && request.resource.data.flower >= 0 && request.resource.data.flower <= 4
         && request.resource.data.createdAt == request.time
         && request.resource.data.status in ['public', 'hidden']

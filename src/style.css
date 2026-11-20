@@ -93,3 +93,9 @@ textarea:focus{border-color:#e0b48e}
 .parchment .slabel{color:#93754f}
 .parchment .hard{color:#4a3622}
 .parchment .face{border-left:none;padding-left:0;color:#5a4329}
+/* 種カード：① と ② の区切り／種まきの会話の入力欄とプレビュー */
+.psep{height:1px;margin:2px 0 14px;background:linear-gradient(90deg,rgba(150,104,48,0),rgba(150,104,48,.35) 20%,rgba(150,104,48,.35) 80%,rgba(150,104,48,0))}
+.parchment .hard:last-child,.parchment .face:last-child{margin-bottom:8px}
+.talkin{margin-top:12px}
+.preview{animation:fadein .35s;margin-top:4px}
+.preview .parchment{margin-bottom:4px}
