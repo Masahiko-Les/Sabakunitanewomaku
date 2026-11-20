@@ -43,6 +43,9 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const VC={x:50*TILE,y:49.6*TILE};
 const VILLAGES=[{id:'hajimari',name:'はじまりの村',x:VC.x/TILE,y:VC.y/TILE,core:2.0,r:2.3}];
 const HOUSE={x:VC.x,y:VC.y-40};
+// 右上の砂嵐の向こうに見える、もう一軒の家（将来、おじいちゃんが住む。いまは建物だけで、砂嵐で近づけない）
+// 村の中心から右上へ約 16.5 マス：砂嵐が濃くなる境目から 3〜5 マスほど奥で、嵐の縁まで歩くと画面に入る
+const HOUSE2={x:61.5*TILE,y:38.3*TILE};
 const FIRE={x:VC.x,y:VC.y+12};
 const TREES=[];
 const GRAN={x:VC.x-50,y:VC.y+10};
@@ -75,7 +78,7 @@ const SAMPLES=[
 const decor=new Uint8Array(N*N), decoList=[];
 {const r=mulberry(7),skip=new Set(SAMPLES.map(([dx,dy])=>(50+dy)*N+50+dx));
  for(let i=0;i<460;i++){const x=Math.floor(r()*N),y=Math.floor(r()*N),p=r(),s=.8+r()*.5,o=r();
-  if(Math.hypot(x+.5-VC.x/TILE,y+.5-VC.y/TILE)<6.5)continue;if(decor[y*N+x]||skip.has(y*N+x))continue;
+  if(Math.hypot(x+.5-VC.x/TILE,y+.5-VC.y/TILE)<6.5)continue;if(Math.hypot(x+.5-HOUSE2.x/TILE,y+.5-HOUSE2.y/TILE)<2.5)continue;if(decor[y*N+x]||skip.has(y*N+x))continue;
   const type=p<.42?1:p<.82?2:3;decor[y*N+x]=type;decoList.push({x,y,type,s,o})}}
 
 /* ---------- state ---------- */
@@ -147,6 +150,7 @@ function solid(wx,wy){const[tx,ty]=tileOf(wx,wy);
  if(tx<0||ty<0||tx>=N||ty>=N)return 'edge';
  if(storm[ty*N+tx]>.5)return 'storm';
  if(wx>HOUSE.x-44&&wx<HOUSE.x+44&&wy>HOUSE.y-56&&wy<HOUSE.y+4)return 'obj';
+ if(wx>HOUSE2.x-44&&wx<HOUSE2.x+44&&wy>HOUSE2.y-56&&wy<HOUSE2.y+4)return 'obj';
  if(Math.hypot(wx-FIRE.x,(wy-FIRE.y)*1.6)<24)return 'obj';
  if(Math.hypot(wx-GRAN.x,(wy-GRAN.y-6)*1.6)<14)return 'obj';
  for(const t of TREES)if(Math.hypot(wx-t.x,(wy-t.y)*1.6)<12)return 'obj';
@@ -247,7 +251,7 @@ function drawPlayer(t){const bob=moving?Math.sin(t/85)*1.4:0,k=moving?Math.sin(t
  ell(x+f*1.3,y-12.2+bob,4.9,5,SK);
  ctx.fillStyle=H;ctx.beginPath();ctx.roundRect(x-7.2-f*.5,y-20+bob,14.4,5.6,[7,7,0,0]);ctx.fill();
  ell(x+f*3.2,y-11.6+bob,.9,1.1,'#3e3026')}
-function drawHouse(){const x=HOUSE.x,y=HOUSE.y;
+function drawHouse(h=HOUSE){const x=h.x,y=h.y;
  ell(x+6,y+4,54,11,'rgba(60,80,40,.22)');
  ctx.fillStyle='#efe0c4';ctx.fillRect(x-40,y-46,80,48);ctx.fillStyle='rgba(120,90,60,.10)';ctx.fillRect(x+18,y-46,22,48);
  ctx.fillStyle='#a7623f';ctx.fillRect(x+22,y-92,10,22);
@@ -300,7 +304,8 @@ function draw(t){ctx.setTransform(dpr,0,0,dpr,0,0);ctx.globalCompositeOperation=
  const items=[];
  for(const d of decoList){const x=d.x*TILE+TILE/2,y=d.y*TILE+TILE/2;if(vis(x,y))items.push([y,()=>drawDecor(d)])}
  for(const s of S.seeds){if(!shown(s))continue;const x=s.x*TILE+TILE/2,y=s.y*TILE+TILE/2;if(vis(x,y))items.push([y+4,()=>drawSeed(s,t)])}
- if(vis(HOUSE.x,HOUSE.y)){items.push([HOUSE.y,drawHouse]);items.push([FIRE.y,drawFireBase]);items.push([GRAN.y+8,()=>drawGranny(t)])}
+ if(vis(HOUSE2.x,HOUSE2.y))items.push([HOUSE2.y,()=>drawHouse(HOUSE2)]);
+ if(vis(HOUSE.x,HOUSE.y)){items.push([HOUSE.y,()=>drawHouse()]);items.push([FIRE.y,drawFireBase]);items.push([GRAN.y+8,()=>drawGranny(t)])}
  for(const tr of TREES)if(vis(tr.x,tr.y))items.push([tr.y,()=>drawTree(tr,t)]);
  for(const b of BUSHES)if(vis(b.x,b.y))items.push([b.y,()=>drawBush(b)]);
  items.push([P.y+10,()=>drawPlayer(t)]);
@@ -308,6 +313,9 @@ function draw(t){ctx.setTransform(dpr,0,0,dpr,0,0);ctx.globalCompositeOperation=
  ctx.restore();
  ctx.drawImage(stormC,cam.x/TILE,cam.y/TILE,vw/TILE,vh/TILE,0,0,vw,vh);
  ctx.globalAlpha=.55;ctx.drawImage(stormC,cam.x/TILE+Math.sin(t/700)*.35,cam.y/TILE+Math.cos(t/900)*.25,vw/TILE,vh/TILE,0,0,vw,vh);ctx.globalAlpha=1;
+ // 砂嵐の向こうの家：嵐が濃いあいだは、砂ぼこりの奥にうっすら見える（嵐が退けば、ふつうの家として見える）
+ {const st=stormAt(HOUSE2.x,HOUSE2.y-20);if(st>.05&&HOUSE2.x>cam.x-120&&HOUSE2.x<cam.x+vw+120&&HOUSE2.y>cam.y-60&&HOUSE2.y<cam.y+vh+140){
+  ctx.save();ctx.translate(-cam.x,-cam.y);ctx.globalAlpha=.42*st;drawHouse(HOUSE2);ctx.restore()}}
  ctx.lineWidth=1.2;ctx.lineCap='round';
  for(const p of dust){const st=stormAt(p.x+cam.x,p.y+cam.y);if(st<.15)continue;ctx.strokeStyle=`rgba(255,244,225,${.5*st})`;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x-p.len,p.y-p.len*.28);ctx.stroke()}
  const flick=1+.025*Math.sin(t/1100)+.015*Math.sin(t/430);
