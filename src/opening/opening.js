@@ -45,9 +45,9 @@ const GIRL_SVG = `<svg id="girl" viewBox="18 8 106 98" aria-hidden="true">
       <path d="M55.6 49.6 l-.8 1.4 M57.8 50.7 l-.4 1.5 M60.2 50.9 l0 1.5" stroke="#21151a" stroke-width=".7" stroke-linecap="round"/>
       <path d="M45.6 48.8 Q48 50.8 50.6 49.2" stroke="#21151a" stroke-width="1.3" fill="none" stroke-linecap="round"/>
       <path d="M46.2 49.6 l-.6 1.2 M48.2 50.3 l-.3 1.3" stroke="#21151a" stroke-width=".6" stroke-linecap="round"/>
-      <path d="M61.4 51.6 C61.6 54.5 60.6 57 61.2 59 C61.8 60.8 63.6 60.2 63.4 58.4 C63.2 56 62.2 53.8 61.4 51.6 Z" fill="#cfeaff" opacity=".9"/>
+      <path d="M61.4 51.6 C61.6 54.5 60.6 57 61.2 59 C61.8 60.8 63.6 60.2 63.4 58.4 C63.2 56 62.2 53.8 61.4 51.6 Z" fill="#6fb2e8" opacity=".95"/>
       <circle cx="62.1" cy="58.4" r=".55" fill="#fff"/>
-      <path d="M47.6 51.4 C47.2 53 47 54 47.3 55.2" stroke="#cfeaff" stroke-width=".9" fill="none" stroke-linecap="round" opacity=".8"/>
+      <path d="M47.6 51.4 C47.2 53 47 54 47.3 55.2" stroke="#6fb2e8" stroke-width=".9" fill="none" stroke-linecap="round" opacity=".8"/>
       <path d="M56 43.8 Q59.5 42.6 63 43.8 M46.5 44 Q48.5 43 50.5 43.6" stroke="#4a3a2e" stroke-width=".8" fill="none" stroke-linecap="round" opacity=".7"/>
       <path d="M44.6 52.6 l-.9 .9" stroke="#e3a99a" stroke-width=".8" stroke-linecap="round"/>
       <path d="M49.4 58 Q51 57.1 52.6 57.9" stroke="#c96f6a" stroke-width=".9" fill="none" stroke-linecap="round"/>
