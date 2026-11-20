@@ -32,9 +32,9 @@ await fetch('http://127.0.0.1:8080/emulator/v1/projects/demo-sabaku/databases/(d
 await page.goto(URL, { waitUntil: 'load' });
 await page.locator('#sheet.on').waitFor({ timeout: 15000 });
 const uid = await uidOf();
-await fetch(`${FS}/users/${uid}?updateMask.fieldPaths=tutorial&updateMask.fieldPaths=introSeen&updateMask.fieldPaths=metGranny`, {
+await fetch(`${FS}/users/${uid}?updateMask.fieldPaths=tutorial&updateMask.fieldPaths=introSeen&updateMask.fieldPaths=metGranny&updateMask.fieldPaths=dummies`, {
   method: 'PATCH', headers: OWNER,
-  body: JSON.stringify({ fields: { tutorial: { integerValue: 3 }, introSeen: { booleanValue: true }, metGranny: { booleanValue: true } } }) });
+  body: JSON.stringify({ fields: { tutorial: { integerValue: 3 }, introSeen: { booleanValue: true }, metGranny: { booleanValue: true }, dummies: { mapValue: { fields: { s0: { mapValue: { fields: { x: { integerValue: 0 }, y: { integerValue: 0 } } } } } } } } }) });
 await page.reload({ waitUntil: 'load' }); await boot();
 
 // ── 右上は ⚙ だけ

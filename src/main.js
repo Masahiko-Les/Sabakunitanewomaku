@@ -82,13 +82,16 @@ const KEY='sabaku-ni-tane-v3';
 let S={seeds:[],init:false,introSeen:false};
 let ready=false; // users/{uid} を読み終えるまで操作を受け付けない
 const MUTED={}; // 知らせた手紙（users/{uid}.muted、'種ID_書いた人' → true）。自分の画面には出さない
+const DUMMIES={}; // おばあちゃんの種が咲いたあとに蒔かれる 3 つの種の場所（users/{uid}.dummies、's0'〜's7' → {x,y}）
 const SEEN={}; // 種ごとに、最後に見たできごとの時刻（users/{uid}.seen）
 const FLOWERS=[{p:'#f29bb0',c:'#f7d36b',n:5,g:'255,150,180'},{p:'#f7c948',c:'#c97b2b',n:8,g:'255,210,90'},{p:'#ffffff',c:'#f2c14e',n:6,g:'255,250,235'},{p:'#b79be8',c:'#f5e08a',n:5,g:'190,160,255'},{p:'#f59a7a',c:'#fff1c1',n:6,g:'255,170,130'}];
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function load(){try{localStorage.removeItem('sabaku-ni-tane-v1');localStorage.removeItem('sabaku-ni-tane-v2');const r=localStorage.getItem(KEY);if(r)S=JSON.parse(r)}catch(e){}
  if(!S.init){S.seeds=sampleSeeds();S.init=true;save()}}
-function sampleSeeds(){return USE_SAMPLES?SAMPLES.map(([dx,dy,h,f,bloom,sprout],i)=>({id:'s'+i,x:50+dx,y:50+dy,mine:false,h,f,t:Date.now()-86400000*(i+1),flower:i%5,letters:[],bloom,sprout,sample:true})):[]}
+function sampleSeeds(){if(USE_SAMPLES)return SAMPLES.map(([dx,dy,h,f,bloom,sprout],i)=>({id:'s'+i,x:50+dx,y:50+dy,mine:false,h,f,t:Date.now()-86400000*(i+1),flower:i%5,letters:[],bloom,sprout,sample:true}));
+ // おばあちゃんの種が咲いたあとに蒔かれる、見本の文章から選んだ 3 つの種（users/{uid}.dummies に場所を保存）
+ return Object.entries(DUMMIES).map(([id,{x,y}])=>{const i=+id.slice(1),[,,h,f]=SAMPLES[i];return{id,x,y,mine:false,h,f,t:Date.now(),flower:i%5,letters:[],bloom:0,sprout:false,sample:true}})}
 load();
 const thanksOf=s=>(s.bloom||0)+s.letters.filter(l=>l.thanked).length;
 const stageOf=s=>thanksOf(s)>0?'flower':(s.letters.length||s.sprout)?'sprout':'seed';
@@ -307,11 +310,15 @@ function draw(t){ctx.setTransform(dpr,0,0,dpr,0,0);ctx.globalCompositeOperation=
  if(night>.01){
   dctx.setTransform(dpr,0,0,dpr,0,0);dctx.globalCompositeOperation='source-over';dctx.clearRect(0,0,vw,vh);
   dctx.fillStyle=`rgba(5,7,22,${.93*night})`;dctx.fillRect(0,0,vw,vh);
-  dctx.globalCompositeOperation='destination-out';dctx.translate(-cam.x,-cam.y);
+  dctx.globalCompositeOperation='destination-out';
+  // 緑地は夜でもわずかに明るく（花が咲いて緑が広がったのが、暗闇でも分かるように）
+  dctx.globalAlpha=.3;dctx.drawImage(greenC,cam.x/TILE,cam.y/TILE,vw/TILE,vh/TILE,0,0,vw,vh);dctx.globalAlpha=1;
+  dctx.translate(-cam.x,-cam.y);
   hole(dctx,FIRE.x,FIRE.y-6,175*flick,.95);
   for(const s of S.seeds){if(stageOf(s)!=='flower')continue;const x=s.x*TILE+TILE/2,y=s.y*TILE+TILE/2;if(!vis(x,y))continue;hole(dctx,x,y-2,36,.9)}
   hole(dctx,P.x,P.y,62,.4);
   ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(dk,0,0);ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.globalCompositeOperation='lighter';ctx.globalAlpha=.08*night;ctx.drawImage(greenC,cam.x/TILE,cam.y/TILE,vw/TILE,vh/TILE,0,0,vw,vh);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
   ctx.save();ctx.translate(-cam.x,-cam.y);ctx.globalCompositeOperation='lighter';
   glow(FIRE.x,FIRE.y-8,150*flick,'255,130,40',.32*night);glow(FIRE.x,FIRE.y-10,55*flick,'255,190,90',.4*night);
   for(const s of S.seeds){if(stageOf(s)!=='flower')continue;const x=s.x*TILE+TILE/2,y=s.y*TILE+TILE/2;if(!vis(x,y))continue;
@@ -379,7 +386,7 @@ function openSeed(s){if(s.mine)return openMine(s);if(s.granny)return openGrannyS
  let body=`<div class="kicker">誰かの種</div><div class="parchment"><p class="slabel">生きづらさ：</p><p class="hard">${esc(s.h)}</p><p class="slabel">それにどう向き合っているか：</p><p class="face">${esc(s.f)}</p></div><p class="state">${stageText[stageOf(s)]}</p>`;
  if(!mine&&(S.tutorial||0)<3){body+=`<p class="note">水やりは、焚き火のそばのおばあちゃんに教わってからにしよう。</p><div class="row"><button class="btn soft small" id="x">閉じる</button></div>`}
  else if(!mine){body+=`<label>優しい言葉の手紙で、水をあげる（10行まで）</label><textarea id="tL" rows="5" maxlength="300" placeholder="アドバイスより、まずは受けとめる言葉を"></textarea><div class="count" id="cL"></div>
-  <p class="note">手紙は、この種を蒔いた人にだけ届きます。ほかの人には見えません。</p>
+  ${s.sample?'':'<p class="note">手紙は、この種を蒔いた人にだけ届きます。ほかの人には見えません。</p>'}
   <div class="row"><button class="btn ghost small" id="x">閉じる</button><button class="btn main small" id="ok" disabled>水をあげる</button></div>`}
  else{body+=`<div class="letter"><div class="from">あなたが届けた手紙</div><div class="txt">${esc(mine.text)}</div></div>
   <p class="state">${mine.thanked?'ありがとうが返ってきて、花がひとつ咲きました。':'手紙は届いています。'}</p><div class="row"><button class="btn soft small" id="x">閉じる</button></div>`}
@@ -485,7 +492,7 @@ const TUT={
   '水やりのこつは「アドバイスより、共感」。「こうしたら？」より、「それはさみしいね」「その考え方、すてきだね」って、受けとめる言葉をかけてあげることさ。',
   'うまく書こうとしなくていいからね。わたしの種を読んで、やさしい言葉で水をあげてみておくれ。'],
  remind:['わたしの種は、すぐそばの左のところだよ。','アドバイスより、共感。受けとめる言葉で、水をあげてみておくれ。'],
- reading:['（おばあちゃんが、あんたの手紙をゆっくり読んでいる……）','……ありがとうねぇ。あったかい言葉だった。','こんなふうに言ってもらえると、明日もまた薪をくべようって思えるよ。','じゃあ、わたしからも「ありがとう」を返そうね。'],
+ reading:['（おばあちゃんが、あなたの言葉をゆっくり読んでいる……）','……ありがとうねぇ。あったかい言葉だった。','こんなふうに言ってもらえると、明日もまた薪をくべようって思えるよ。','じゃあ、わたしからも「ありがとう」を返そうね。'],
  finish:['ほら、咲いたねぇ。まわりの砂も、少し緑になっただろう？','あんたの言葉で、この砂漠がひとつ、生きやすくなったんだよ。','こんどは、あんたの番だ。緑の上に立って、あんたの生きづらさを種にして蒔いてごらん。','あんたの種も、どこかの誰かの砂漠に届いて、きっと誰かが水をあげてくれるからね。','書き方に迷ったら、いつでもわたしに聞きにおいで。']};
 function talkSheet(build){openSheet(`<div class="kicker">焚き火のそばのおばあちゃん</div><div class="talk" id="talk"></div><div id="ctl"></div>`,el=>{
  const talk=el.querySelector('#talk'),ctl=el.querySelector('#ctl');
@@ -505,6 +512,7 @@ function finishTutorial(){S.tutorial=3;S.metGranny=true;save();saveUser({tutoria
 function grannyThanks(){talkSheet(({play,button})=>play(TUT.reading,()=>button('花を見る',()=>{
  const g=grannySeed(),l=g&&myLetter(g);if(l&&!l.thanked){l.thanked=true;l.thankedAt=Date.now();save()}
  closeSheet();if(g)bloom(g);
+ setTimeout(plantDummies,1600);
  setTimeout(()=>talkSheet(({play,button})=>play(TUT.finish,()=>button('はじめる',finishTutorial))),3200)})))}
 function openGrannySeed(s){const mine=myLetter(s),tu=S.tutorial||0;
  let body=`<div class="kicker">おばあちゃんの種</div><div class="parchment"><p class="slabel">生きづらさ：</p><p class="hard">${esc(s.h)}</p><p class="slabel">それにどう向き合っているか：</p><p class="face">${esc(s.f)}</p></div>`;
@@ -574,6 +582,7 @@ requestAnimationFrame(frame);refreshDot();
 // 講習の進み具合・説明を見たか・おばあちゃんへの手紙は users/{uid} を正とする
 function applyUser(u){if(!u)return;S.tutorial=u.tutorial||0;S.metGranny=!!u.metGranny;S.introSeen=!!u.introSeen;
  U.openingSeen=!!u.openingSeen;U.receivedToday=u.receivedToday||0;U.receivedDate=u.receivedDate||'';Object.assign(SEEN,u.seen||{});Object.assign(MUTED,u.muted||{});
+ if(!USE_SAMPLES&&u.dummies){Object.assign(DUMMIES,u.dummies);const have=new Set(S.seeds.map(s=>s.id));S.seeds.push(...sampleSeeds().filter(s=>!have.has(s.id)))}
  for(const s of S.seeds){if(!s.sample)continue;const l=(u.sampleLetters||{})[s.id];
   if(l)s.letters=[{id:'sample-letter',from:'me',text:l.text,t:l.t,thanked:!!l.thanked}];else s.letters=[]}
  const g=grannySeed();if(g)g.letters=u.grannyLetter?[{id:'granny-letter',from:'me',text:u.grannyLetter,t:Date.now(),thanked:S.tutorial>=2}]:[];
@@ -597,6 +606,14 @@ function sampleThanks(){const t=dayKey(Date.now());let ch=false;
  if(ch){save();refreshDot()}}
 
 /* ---------- delivery: まだ 5 つの世界に届いていない種を、自分の世界に受け取る ---------- */
+// おばあちゃんの種が咲いたら、見本の文章から 3 つ選んで、空いている緑のマスにランダムに蒔く（自分で蒔く場所は残す）
+const DUMMY_COUNT=3;
+function plantDummies(){if(USE_SAMPLES||Object.keys(DUMMIES).length)return;
+ const free=freeGreenTiles(),n=Math.min(DUMMY_COUNT,free.length-KEEP_FREE);if(n<=0)return;
+ const ids=SAMPLES.map((_,i)=>i).sort(()=>Math.random()-.5).slice(0,n);
+ for(const i of ids){const [x,y]=free.splice(Math.floor(Math.random()*free.length),1)[0];DUMMIES['s'+i]={x,y}}
+ saveUser({dummies:{...DUMMIES}});
+ const have=new Set(S.seeds.map(s=>s.id));S.seeds.push(...sampleSeeds().filter(s=>!have.has(s.id)));save();rebuildWorld()}
 function freeGreenTiles(){const out=[];
  for(let y=0;y<N;y++)for(let x=0;x<N;x++){if(green[y*N+x]<.5||inVillage(x,y)||decor[y*N+x]||onDrawing(x,y)||seedOn(x,y))continue;out.push([x,y])}
  return out}
@@ -660,7 +677,7 @@ function runOpening(){let chose=false;
    if((S.tutorial||0)===0)talkSheet(({play,button})=>play(grandmaLines(c),()=>button('おばあちゃんの種を見にいく',goGrannySeed)));
    else talkSheet(({play,button})=>play(arrivalLines(c),()=>button('はじめる',closeSheet)))}})}
 
-initUser().then(async u=>{if(u)applyWorld(await loadMyWorld());applyUser(u);startWatchers()}).catch(e=>console.error('[initUser]',e)).finally(()=>{ready=true;sampleThanks();refreshDot();
+initUser().then(async u=>{if(u)applyWorld(await loadMyWorld());applyUser(u);startWatchers();if(u&&(S.tutorial||0)>=2)plantDummies()}).catch(e=>console.error('[initUser]',e)).finally(()=>{ready=true;sampleThanks();refreshDot();
  // はじめての人（講習を始めておらず、オープニングも見ていない）にだけ、オープニングを出す
  if(openingEl&&(forceOpening||(!S.metGranny&&(S.tutorial||0)===0&&!U.openingSeen))){runOpening();receiveSeeds();setInterval(receiveSeeds,DELIVERY_INTERVAL);setInterval(()=>{sampleThanks();prune()},60*1000);return}
  if(openingEl){openingEl.remove();openingEl=null}

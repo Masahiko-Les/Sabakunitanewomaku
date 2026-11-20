@@ -55,6 +55,13 @@ await expect(false, '選択肢にない関心テーマ', () => updateDoc(U(B), {
 await expect(false, '関心テーマに文字列以外', () => updateDoc(U(B), { interest: 3 }));
 await expect(false, '見た印に bool 以外', () => updateDoc(U(B), { openingSeen: 'yes' }));
 
+// おばあちゃんの種が咲いたあとの 3 つの種の場所
+await expect(true, '3 つの種の場所を保存する', () => updateDoc(U(B), { dummies: { s0: { x: 47, y: 52 }, s3: { x: 53, y: 49 }, s7: { x: 48, y: 48 } } }));
+await expect(false, '4 つ以上は保存できない', () => updateDoc(U(B), { dummies: { s0: { x: 1, y: 1 }, s1: { x: 2, y: 2 }, s2: { x: 3, y: 3 }, s3: { x: 4, y: 4 } } }));
+await expect(false, '見本にない ID', () => updateDoc(U(B), { dummies: { s9: { x: 1, y: 1 } } }));
+await expect(false, '世界の外の場所', () => updateDoc(U(B), { dummies: { s0: { x: 100, y: 1 } } }));
+await expect(false, '場所以外のフィールド', () => updateDoc(U(B), { dummies: { s0: { x: 1, y: 1, text: 'x' } } }));
+
 // 「すべてのデータを消す」
 await expect(true, 'A が自分の users を消す（すべてのデータを消す）', () => deleteDoc(U(A)));
 

@@ -29,7 +29,7 @@ service cloud.firestore {
     function okUser(d) {
       return d.keys().hasOnly(['createdAt','tutorial','metGranny','introSeen','grannyLetter',
                                'receivedToday','receivedDate','seen','sampleLetters','muted',
-                               'openingSeen','interest'])
+                               'openingSeen','interest','dummies'])
         && d.get('tutorial', 0) is int && d.get('tutorial', 0) >= 0 && d.get('tutorial', 0) <= 3
         && d.get('metGranny', false) is bool
         && d.get('introSeen', false) is bool
@@ -44,7 +44,18 @@ service cloud.firestore {
             || d.interest in ['吃音','うつ','不安・パニック','摂食障害','発達の特性','介護','子育て','不登校・ひきこもり','仕事','人間関係','その他','none'])
         // 知らせた手紙（自分の画面に出さない）
         && (d.get('muted', {}) is map && d.get('muted', {}).size() <= 2000)
-        && okSamples(d.get('sampleLetters', {}));
+        && okSamples(d.get('sampleLetters', {}))
+        && okDummies(d.get('dummies', {}));
+    }
+    // おばあちゃんの種が咲いたあとに蒔かれる 3 つの種の場所（見本の文章 s0〜s7 から選ぶ）
+    function okDummy(m, k) {
+      return !(k in m) || (m[k] is map && m[k].keys().hasOnly(['x','y'])
+        && m[k].x is int && m[k].x >= 0 && m[k].x < 100 && m[k].y is int && m[k].y >= 0 && m[k].y < 100);
+    }
+    function okDummies(m) {
+      return m is map && m.size() <= 3 && m.keys().hasOnly(['s0','s1','s2','s3','s4','s5','s6','s7'])
+        && okDummy(m,'s0') && okDummy(m,'s1') && okDummy(m,'s2') && okDummy(m,'s3')
+        && okDummy(m,'s4') && okDummy(m,'s5') && okDummy(m,'s6') && okDummy(m,'s7');
     }
     // 1 日の受け取り数は、同じ日のうちは減らせない。日付は進めることしかできず、進めたら 1 から数え直す
     function okCount(o, n) {
