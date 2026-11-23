@@ -804,8 +804,9 @@ async function receiveWithRetry(id,x,y,t){
  return null}
 let delivering=false;
 // 本物の種を、最大 max 個まで受け取る（1 日 3 つまで）。受け取った数を返す
+// 1 日の受け取り数は、本当の日付で数える（ルールが、サーバーの時刻より先の日付を受け付けないため。「次の日にする」で進めても、本物の種は本当の 1 日に 3 つまで）
 async function receiveReal(max){let got=0;
- {const t=dayKey(clock());let n=U.receivedDate===t?U.receivedToday:0;if(n>=DAILY_RECEIVE)return 0;const lim=Math.min(DAILY_RECEIVE,n+max);
+ {const t=dayKey(Date.now());let n=U.receivedDate===t?U.receivedToday:0;if(n>=DAILY_RECEIVE)return 0;const lim=Math.min(DAILY_RECEIVE,n+max);
   // ほかの人に先を越されることもあるので、候補は多めに取り、足りなければ探しなおす
   for(let round=0;round<3&&n<lim;round++){
   const ids=await findDeliverable(new Set(S.seeds.map(s=>s.id)),(lim-n)*4).catch(e=>{console.error('[findDeliverable]',e);return[]});if(!ids.length)break;
@@ -827,7 +828,7 @@ async function receiveSeeds(){if(delivering||!ready||(S.tutorial||0)<3||!practic
  try{let need=FILL_TARGET-seedStateCount();
   if(need>0&&FB){need-=await receiveReal(need).catch(e=>{console.error('[receiveReal]',e);return 0});
    // ほかの人と取り合いになったり、通信に失敗したりして、まだ届けられる本物の種が残っているなら、今日の補充はまだ終えない（少しして、もう一度）
-   const n=U.receivedDate===today?U.receivedToday:0;
+   const n=U.receivedDate===dayKey(Date.now())?U.receivedToday:0;
    if(need>0&&n<DAILY_RECEIVE){const left=await findDeliverable(new Set(S.seeds.map(s=>s.id)),1).catch(()=>null);
     if(left===null||left.length){refillRetry=Math.min(6,refillRetry+1);if(refillRetry<6){setTimeout(receiveSeeds,3000+Math.random()*4000);return}}}}
   if(need>0)addFillers(need);
