@@ -5,6 +5,8 @@ import { startOpening, grandmaLines, arrivalLines } from './opening/opening.js';
 import { PLANT_TALK, PLANT_BUTTONS, PLANT_PLACEHOLDERS } from './talk/plant.js';
 import { WateringAnimation, chooseStandTile } from './watering/watering-animation.js';
 import { drawGirlWithCan } from './watering/girl-with-can.js';
+import { SPROUT_ZOOM, drawSproutZoom, makeSproutZoomSeed } from './watering/sprout-zoom.js';
+import { BloomBurst } from './bloom/bloom-burst.js';
 
 // 見本の種 8 つを置くか。公開版では置かない（最初は種も花もない）。VITE_USE_SAMPLES=true で試作版と同じく置く
 const USE_SAMPLES = import.meta.env.VITE_USE_SAMPLES === 'true';
@@ -190,7 +192,9 @@ function update(dt,now){
  // 水やり演出：操作を返すまでは、女の子の位置と向きは演出が決める。終わったら、あとの処理（after）へ
  if(water){const st=water.anim.update(now);
   if(st.lockInput){P.x=st.girlPx.x;P.y=st.girlPx.y-11;if(st.facing==='left')P.face=-1;else if(st.facing==='right')P.face=1;moving=st.walking;target=null;pendingOpen=null}
-  if(water.anim.finished){const a=water.after;water=null;if(a)a()}}
+  // マップの芽が開ききったら、画面の中央で種を大きく映して、芽が出るところを見せる（シートを開いていたら出さない）
+  if(!water.zoomed&&(now-water.anim.startMs)/1000+water.anim.offset>=SPROUT_ZOOM.startAt){water.zoomed=true;if(!sheetOpen&&!reduceMotion())openZoom()}
+  if(water.anim.finished){const a=water.after;water=null;if(a){if(zoom)zoom.after=a;else a()}}}
  if(!sheetOpen&&!inputLocked()){if(keys.ArrowLeft||keys.a)vx--;if(keys.ArrowRight||keys.d)vx++;if(keys.ArrowUp||keys.w)vy--;if(keys.ArrowDown||keys.s)vy++}
  const sp=175;let mx=0,my=0;
  if(vx||vy){target=null;pendingOpen=null;const l=Math.hypot(vx,vy);mx=vx/l*sp*dt;my=vy/l*sp*dt}
@@ -345,6 +349,7 @@ function draw(t){ctx.setTransform(dpr,0,0,dpr,0,0);ctx.globalCompositeOperation=
   for(const s of S.seeds){if(stageOf(s)!=='flower')continue;const x=s.x*TILE+TILE/2,y=s.y*TILE+TILE/2;if(!vis(x,y))continue;hole(dctx,x,y-2,36,.9)}
   hole(dctx,P.x,P.y,62,.4);
   if(water){const sp=water.anim.seedPx;hole(dctx,sp.x,sp.y-4,40,.55)} // 夜でも、水滴・波紋・芽が見えるように
+  for(const l of burstLights())hole(dctx,l.x,l.y,l.r,l.a); // 花が咲く演出は、夜の暗闇を照らす
   ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(dk,0,0);ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.globalCompositeOperation='lighter';ctx.globalAlpha=.08*night;ctx.drawImage(greenC,cam.x/TILE,cam.y/TILE,vw/TILE,vh/TILE,0,0,vw,vh);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
   ctx.save();ctx.translate(-cam.x,-cam.y);ctx.globalCompositeOperation='lighter';
@@ -362,7 +367,7 @@ function draw(t){ctx.setTransform(dpr,0,0,dpr,0,0);ctx.globalCompositeOperation=
  if(!sheetOpen&&Math.hypot(P.x-GRAN.x,P.y-GRAN.y)<230){const bx=GRAN.x+2,by=GRAN.y-40+Math.sin(t/500)*1.5;
   ctx.fillStyle='rgba(255,252,245,.95)';ctx.beginPath();ctx.roundRect(bx-15,by-10,30,18,9);ctx.fill();ctx.beginPath();ctx.moveTo(bx-3,by+7);ctx.lineTo(bx,by+12);ctx.lineTo(bx+3,by+7);ctx.fill();
   for(let i=-1;i<=1;i++)ell(bx+i*7,by-1,1.7,1.7,`rgba(138,117,96,${.45+.55*((Math.floor(t/350)%3)===i+1)})`)}
- ctx.restore();drawFall(t);drawGust(t);drawWaterAir()}
+ ctx.restore();drawFall(t);drawGust(t);drawWaterAir();drawBursts(vis,vw,vh)}
 function drawGranny(t){const x=GRAN.x,y=GRAN.y,br=Math.sin(t/900)*.6;
  ell(x,y+11,14,4.5,'rgba(60,50,40,.22)');
  ctx.fillStyle='#8a5e3e';ctx.beginPath();ctx.roundRect(x-11,y+2,22,8,3);ctx.fill();ell(x+11,y+6,2.5,4,'#a87a55');
@@ -387,14 +392,61 @@ function contactsHTML(){const c=(t,n,d)=>`<div class="ct"><b>${t}</b><a class="n
  return `<div class="care contacts">${c('命があぶないとき・けがをしているとき','119','救急')}${c('#いのちSOS','0120-061-338','24時間・無料')}${c('よりそいホットライン','0120-279-338','24時間・無料')}${c('いのちの電話','0120-783-556','毎日16〜21時・無料')}${c('こころの健康相談統一ダイヤル','0570-064-556','住んでいる地域の公的な窓口につながります')}${c('18歳までの人 ── チャイルドライン','0120-99-7777','毎日16〜21時・無料')}
  <a class="lk" href="https://www.mhlw.go.jp/mamorouyokokoro/" target="_blank" rel="noopener">まもろうよ こころ（電話・LINE・チャットの相談先一覧）</a><p class="note">受付時間は変わることがあります。</p></div>`}
 function careHTML(){return `<p class="hard" style="font-size:15.5px">つらい気持ちを、ここに書いてくれてありがとう。ひとりで抱えこまずに、信頼できる人や、相談の窓口に話してみてください。</p>${contactsHTML()}`}
-function bloom(s){s.bloomAt=Date.now();const before=storm.reduce((a,v)=>a+(v>.5),0);rebuildWorld();const after=storm.reduce((a,v)=>a+(v>.5),0);
+function bloom(s){s.bloomAt=Date.now();queueBurst(s);const before=storm.reduce((a,v)=>a+(v>.5),0);rebuildWorld();const after=storm.reduce((a,v)=>a+(v>.5),0);
  setTimeout(()=>toast(after<before?'花のまわりに緑が広がり、嵐が少しやわらいだ':'花のまわりに、緑が広がった'),900)}
+
+/* ---------- 手紙が届いたら、画面の中央にお知らせ（「やさしい言葉が届きました」「種を見てみる」「あとで」） ---------- */
+// 自分の種に、ほかの人の手紙が届いたとき（閉じているあいだに届いて、まだ見ていない手紙は、次に開いたとき）。1 通につき 1 回だけ
+// シートや水やりの演出、オープニングのあいだは待って、終わってから出す
+const NOTICE_KEY='sabaku-letter-notified';
+const noticed=new Set((()=>{try{return JSON.parse(localStorage.getItem(NOTICE_KEY)||'[]')}catch(e){return[]}})());
+let noticeOpen=false,noticeFor=null,noticeIds=[];
+function queueNotice(s){const ids=s.letters.filter(l=>l.from==='other'&&!l.thanked&&l.t>(SEEN[s.id]||0)&&!noticed.has(s.id+'_'+l.id)).map(l=>s.id+'_'+l.id);
+ if(!ids.length)return;noticeFor=s;noticeIds.push(...ids)}
+function tryNotice(){if(!noticeFor||noticeOpen||zoom||sheetOpen||!ready||openingEl||(water&&water.anim.state.lockInput))return;
+ if(!S.seeds.includes(noticeFor)){noticeFor=null;noticeIds=[];return}
+ for(const id of noticeIds)noticed.add(id);try{localStorage.setItem(NOTICE_KEY,JSON.stringify([...noticed].slice(-300)))}catch(e){}
+ noticeIds=[];noticeOpen=true;target=null;$('#notice').classList.add('on')}
+function closeNotice(){noticeOpen=false;$('#notice').classList.remove('on')}
+$('#noticeLater').onclick=()=>{noticeFor=null;closeNotice()};
+$('#noticeGo').onclick=()=>{const s=noticeFor;noticeFor=null;closeNotice();if(!s||!S.seeds.includes(s))return;goTo(s);setTimeout(()=>openSeed(s),380)};
+setInterval(tryNotice,500);
+
+/* ---------- 水やりのあと、種を大きく映して、芽が出るところを見せる（文字なし。本体は src/watering/sprout-zoom.js） ---------- */
+// 終わったら自動で閉じる。タップでも閉じる。閉じたあとに、水やりのあとの処理（おばあちゃんの会話など）へ
+let zoom=null; // { t0, rnd, after, closing }
+function openZoom(){const cv=$('#zoomCv'),size=cv.clientWidth||280,dpr=Math.min(devicePixelRatio||1,3);
+ cv.width=Math.round(size*dpr);cv.height=Math.round(size*dpr);
+ zoom={t0:performance.now(),rnd:makeSproutZoomSeed(),after:null,closing:false,size,dpr};target=null;pendingOpen=null;
+ $('#zoom').classList.add('on');requestAnimationFrame(zoomFrame)}
+function zoomFrame(now){if(!zoom)return;const z=zoom,t=(now-z.t0)/1000,c=$('#zoomCv').getContext('2d');
+ c.setTransform(z.dpr,0,0,z.dpr,0,0);drawSproutZoom(c,z.size,Math.min(t,SPROUT_ZOOM.close),z.rnd);
+ if(t>=SPROUT_ZOOM.close&&!z.closing){z.closing=true;$('#zoom').classList.remove('on')}
+ if(t>=SPROUT_ZOOM.total){zoom=null;if(z.after)z.after();return}
+ requestAnimationFrame(zoomFrame)}
+$('#zoom').onclick=()=>{if(zoom&&!zoom.closing)zoom.t0=performance.now()-SPROUT_ZOOM.close*1000};
+
+/* ---------- 花が咲くときの、光り輝く演出（ありがとうを返したとき／返ってきたとき）。本体は src/bloom/bloom-burst.js ---------- */
+// 演出は、シートを閉じていて、その花が画面に入ったときに始める（離れた場所の花は、近づいたときに）
+const BURST_KEY='sabaku-bloom-shown';
+const burstShown=new Set((()=>{try{return JSON.parse(localStorage.getItem(BURST_KEY)||'[]')}catch(e){return[]}})());
+let bursts=[]; // { s: 種, b: BloomBurst }
+function queueBurst(s){if(bursts.some(z=>z.s===s))return;
+ const x=s.x*TILE+TILE/2+OFFS[0][0],y=s.y*TILE+TILE/2+OFFS[0][1]-3;
+ bursts.push({s,b:new BloomBurst(x,y,FLOWERS[s.flower%5].g,{reduced:reduceMotion()})})}
+function drawBursts(vis,vw,vh){if(!bursts.length)return;const now=performance.now();
+ for(const z of bursts)if(!z.b.started&&!sheetOpen&&vis(z.b.x,z.b.y)){z.b.start(now);z.s.bloomAt=Date.now();
+  if(!burstShown.has(z.s.id)){burstShown.add(z.s.id);try{localStorage.setItem(BURST_KEY,JSON.stringify([...burstShown].slice(-200)))}catch(e){}}}
+ bursts=bursts.filter(z=>!z.b.done(now)&&S.seeds.includes(z.s));
+ ctx.save();ctx.translate(-cam.x,-cam.y);for(const z of bursts)z.b.draw(ctx,now);ctx.restore();
+ for(const z of bursts)z.b.drawScreenFlash(ctx,vw,vh,now)}
+const burstLights=()=>{const now=performance.now();return bursts.map(z=>z.b.light(now)).filter(Boolean)};
 
 /* ---------- watering: 水やりを保存できたら、女の子がじょうろで種に水をあげる演出 ---------- */
 // 演出の本体・タイムラインは src/watering/watering-animation.js、女の子の絵は src/watering/girl-with-can.js
 let water=null; // { id: 種の id, anim: WateringAnimation, after: 演出が終わったあとの処理 }
 const reduceMotion=()=>{try{return matchMedia('(prefers-reduced-motion: reduce)').matches}catch(e){return false}};
-const inputLocked=()=>!!(water&&water.anim.state.lockInput);
+const inputLocked=()=>!!(water&&water.anim.state.lockInput)||noticeOpen||!!zoom;
 const wateringGirl=()=>!!(water&&water.anim.running&&water.anim.state.lockInput);
 const wateringOf=s=>water&&water.id===s.id&&!water.anim.finished?water.anim.state:null;
 function startWatering(s,after){
@@ -739,7 +791,7 @@ function openSettings(){
    // 自分の記録と自分の世界を消し、新しい匿名アカウントで最初から（ほかの人の世界にある種や手紙はそのまま）
    try{await resetAll()}catch(e){console.error('[resetAll]',e)}
    // 新しいアカウントで、オープニングからはじめる（オープニングを見た印と、選んだ関心テーマも消す）
-   try{localStorage.removeItem(KEY);localStorage.removeItem(OPEN_KEY);localStorage.removeItem(INTEREST_KEY);localStorage.removeItem(DEV_DAYS_KEY)}catch(e){}
+   try{localStorage.removeItem(KEY);localStorage.removeItem(OPEN_KEY);localStorage.removeItem(INTEREST_KEY);localStorage.removeItem(DEV_DAYS_KEY);localStorage.removeItem(BURST_KEY);localStorage.removeItem(NOTICE_KEY)}catch(e){}
    location.reload()}})}
 function openCare(){openSheet(`<div class="kicker">困ったときの相談先</div>${contactsHTML()}<div class="row"><button class="btn main small" id="x">閉じる</button></div>`,e=>e.querySelector('#x').onclick=closeSheet)}
 $('#btnSet').onclick=()=>{if(ready&&!inputLocked())openSettings()};
@@ -860,7 +912,7 @@ function prune(){const gone=S.seeds.filter(s=>expired(s)&&s.loaded&&stageOf(s)!=
 function watchOwn(s){if(!FB||watchers.has(s.id))return;
  watchers.set(s.id,watchLetters(s.id,ls=>{const me=getUid();s.loaded=true;
   s.letters=ls.filter(l=>!MUTED[s.id+'_'+l.id]).sort((a,b)=>a.t-b.t).map(l=>({id:l.id,from:l.writerUid===me?'me':'other',text:l.text,t:l.t,thanked:l.thanked,thankedAt:l.thankedAt}));
-  s.unread=lastEvent(s)>(SEEN[s.id]||0);rebuildSoon()}))}
+  s.unread=lastEvent(s)>(SEEN[s.id]||0);queueNotice(s);rebuildSoon()}))}
 // 届いた種：自分が書いた手紙に、ありがとうが返ってくるまで見張る（返ったら取り消せないので、そこで終わり）
 function watchReceived(s){if(!FB||watchers.has(s.id))return;
  watchers.set(s.id,watchMyLetter(s.id,(l,first)=>{s.loaded=true;
@@ -869,7 +921,10 @@ function watchReceived(s){if(!FB||watchers.has(s.id))return;
   s.letters=[{id:l.id,from:'me',text:l.text,t:l.t,thanked:l.thanked,thankedAt:l.thankedAt}];
   s.unread=lastEvent(s)>(SEEN[s.id]||0);
   if(l.thanked)stopWatch(s.id);
-  if(l.thanked&&!was&&!first){bloom(s);save();refreshDot()}else rebuildSoon()}))}
+  if(l.thanked&&!was&&!first){bloom(s);save();refreshDot()}
+  // 閉じているあいだに返ってきたありがとう：次に開いたとき、まだ演出を見ていなければ（3 日以内のもの）
+  else if(l.thanked&&first&&!burstShown.has(s.id)&&Date.now()-(l.thankedAt||0)<3*86400000){bloom(s);save();refreshDot()}
+  else rebuildSoon()}))}
 function startWatchers(){for(const s of S.seeds){if(s.sample||s.granny)continue;s.mine?watchOwn(s):watchReceived(s)}}
 
 /* ---------- opening: 初回だけ、オープニング → おばあちゃんの到着のことば → 初回講習 ---------- */
